@@ -1,12 +1,10 @@
-"use client";
-
 import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { motion } from "framer-motion";
 
 export default function AuthCallbackPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { handleCallback } = useAuth();
   const handledRef = useRef(false);
 
@@ -18,14 +16,14 @@ export default function AuthCallbackPage() {
     const code = params.get("code");
 
     if (!code) {
-      router.replace("/");
+      navigate("/", { replace: true });
       return;
     }
 
     handleCallback(code)
-      .then(() => router.replace("/"))
-      .catch(() => router.replace("/"));
-  }, [handleCallback, router]);
+      .then(() => navigate("/", { replace: true }))
+      .catch(() => navigate("/", { replace: true }));
+  }, [handleCallback, navigate]);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white flex items-center justify-center">

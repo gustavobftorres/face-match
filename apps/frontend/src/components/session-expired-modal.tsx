@@ -1,4 +1,3 @@
-"use client";
 
 import { motion, AnimatePresence } from "framer-motion";
 import { LockKeyhole, LogIn, X } from "lucide-react";

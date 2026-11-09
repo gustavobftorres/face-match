@@ -5,7 +5,7 @@ Central library for API calls, type definitions, utility functions, and i18n tra
 ## Files
 
 ### `api.ts`
-API functions: `fetchAuthUrl`, `exchangeCode`, `startScan`. All endpoints read from `NEXT_PUBLIC_API_URL`.
+API functions: `fetchAuthUrl`, `exchangeCode`, `startScan`. All endpoints read from `VITE_API_URL`.
 
 ### `types.ts`
 Shared TypeScript interfaces: `AuthState` (with `expiresAt`), `WebSocketMessage` union, `ScanMatch`, etc.

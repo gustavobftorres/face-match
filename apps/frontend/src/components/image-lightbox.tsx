@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Download, ExternalLink } from "lucide-react";
@@ -23,7 +21,7 @@ export function ImageLightbox({ fileId, fileName, onClose, t, accessToken }: Ima
   }, [onClose]);
 
   const previewUrl = accessToken
-    ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1/drive/image/${fileId}?access_token=${accessToken}`
+    ? `${import.meta.env.VITE_API_URL}/api/v1/drive/image/${fileId}?access_token=${accessToken}`
     : `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`;
 
   const handleDownload = () => {

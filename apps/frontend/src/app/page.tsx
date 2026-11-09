@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -75,7 +73,7 @@ export default function Home() {
   }, [t]);
 
   const { isConnected, error: wsError, connect, disconnect } = useScanSocket(
-    process.env.NEXT_PUBLIC_WS_URL,
+    import.meta.env.VITE_WS_URL,
     handleSocketMessage
   );
   useEffect(() => { disconnectRef.current = disconnect; }, [disconnect]);

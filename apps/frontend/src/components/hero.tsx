@@ -1,7 +1,5 @@
-"use client";
 
 import * as React from "react";
-import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, X, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -105,7 +103,7 @@ export function Hero({ onFileSelect, selectedFile, t }: HeroProps) {
                 className="relative shrink-0"
               >
                 <div className="relative w-16 h-16 rounded-xl overflow-hidden border-2 border-primary/20">
-                  <Image src={preview} alt="Target" fill className="object-cover" />
+                  <img src={preview} alt="Target" className="absolute inset-0 w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent" />
                 </div>
 

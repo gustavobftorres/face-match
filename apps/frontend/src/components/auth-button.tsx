@@ -1,4 +1,3 @@
-"use client";
 
 import { motion, AnimatePresence } from "framer-motion";
 import { LogIn, LogOut, User, Loader2 } from "lucide-react";

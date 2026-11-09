@@ -1,10 +1,8 @@
-"use client";
-
 import { useEffect, useRef, useState, useCallback } from "react";
 import { WebSocketMessage } from "@/lib/types";
 
 export function useScanSocket(
-  url: string = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/api/v1/ws/updates",
+  url: string = import.meta.env.VITE_WS_URL || "ws://localhost:8000/api/v1/ws/updates",
   onMessage?: (message: WebSocketMessage) => void
 ) {
   const [isConnected, setIsConnected] = useState(false);

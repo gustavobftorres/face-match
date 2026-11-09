@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, Zap } from "lucide-react";
@@ -80,7 +78,7 @@ export function ResultsGallery({ results, t, accessToken }: ResultsGalleryProps)
                     </div>
 
                     <img
-                      src={`${process.env.NEXT_PUBLIC_API_URL}/api/v1/drive/image/${result.file_id}?access_token=${accessToken}`}
+                      src={`${import.meta.env.VITE_API_URL}/api/v1/drive/image/${result.file_id}?access_token=${accessToken}`}
                       alt={result.file_name}
                       className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
                       loading="lazy"

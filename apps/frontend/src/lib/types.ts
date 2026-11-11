@@ -1,5 +1,7 @@
 export interface ScanProgress {
   type: "progress";
+  scan_id: string;
+  sequence: number;
   file_id: string;
   file_name: string;
   status: "no_face_found" | "no_match" | "error";
@@ -7,40 +9,62 @@ export interface ScanProgress {
 
 export interface ScanMatch {
   type: "match";
+  scan_id: string;
+  sequence: number;
   file_id: string;
   file_name: string;
   status: "match";
   download_url: string;
 }
 
-export interface ScanError {
+export interface ScanFileError {
   type: "error";
-  file_id?: string;
+  scan_id: string;
+  sequence: number;
+  status?: never;
+  file_id: string;
+  file_name: string;
   error: string;
 }
 
+export interface ScanFailed {
+  type: "error";
+  scan_id: string;
+  sequence: number;
+  status: "failed";
+  error: string;
+}
+
+export type ScanError = ScanFileError | ScanFailed;
+
 export interface ScanStarted {
   type: "started";
+  scan_id: string;
+  sequence: number;
   total_files: number;
 }
 
 export interface ScanTokenExpired {
   type: "token_expired";
+  scan_id: string;
+  sequence: number;
   message: string;
 }
 
 export interface ScanCompleted {
   type: "completed";
   scan_id: string;
+  sequence: number;
 }
 
 export type WebSocketMessage = ScanStarted | ScanProgress | ScanMatch | ScanError | ScanTokenExpired | ScanCompleted;
 
-export interface ScanStatusResponse {
-  scan_id: string;
-  status: "running" | "completed";
-  remaining: number;
-}
+export type ScanStatusResponse =
+  | { scan_id: string; status: "running"; remaining: number; last_sequence: number }
+  | { scan_id: string; status: "completed"; remaining: number; last_sequence: number }
+  | { scan_id: string; status: "token_expired"; remaining?: number; last_sequence: number }
+  | { scan_id: string; status: "failed"; remaining: number; last_sequence: number }
+  | { scan_id: string; status: "unknown"; last_sequence: number };
 
 export interface AuthState {
   accessToken: string | null;

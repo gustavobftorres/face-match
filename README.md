@@ -38,6 +38,9 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_WS_URL=ws://localhost:8000/api/v1/ws/updates
 ```
 
+The WebSocket value is the base URL. The client appends `/{scan_id}` and, when
+reconnecting, `?after_sequence=<last_seen_sequence>`.
+
 ### 2. Install dependencies
 
 ```bash
@@ -68,4 +71,5 @@ make stop
 2. Paste a Google Drive folder link
 3. Upload a reference photo of your face
 4. The backend scans every photo in the folder using `face_recognition`
-5. Matches stream back in real time via WebSocket
+5. Scan-scoped, sequenced events stream back in real time via WebSocket and can
+   be replayed after a reconnect

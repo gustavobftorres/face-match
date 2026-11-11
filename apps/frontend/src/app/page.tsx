@@ -33,57 +33,102 @@ export default function Home() {
   const [matches, setMatches] = useState<ScanMatch[]>([]);
   const [showSessionExpired, setShowSessionExpired] = useState(false);
   const [currentScanId, setCurrentScanId] = useState<string | null>(null);
+  const currentScanIdRef = useRef<string | null>(null);
+  const terminalScanIdRef = useRef<string | null>(null);
+  const lastSequenceByScanRef = useRef<Map<string, number>>(new Map());
+  const consumedFileResultsRef = useRef<Set<string>>(new Set());
+  const connectionInFlightRef = useRef(false);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
   const disconnectRef = useRef<() => void>(() => {});
 
+  const completeScan = useCallback((scanId: string) => {
+    if (currentScanIdRef.current !== scanId || terminalScanIdRef.current === scanId) return;
+    terminalScanIdRef.current = scanId;
+    setScanStatus(t("scanComplete"));
+    setIsScanning(false);
+    disconnectRef.current();
+    toast.success(t("scanComplete"), { duration: 3000 });
+  }, [t]);
+
+  const expireScan = useCallback((scanId: string) => {
+    if (currentScanIdRef.current !== scanId || terminalScanIdRef.current === scanId) return;
+    terminalScanIdRef.current = scanId;
+    setScanStatus(t("sessionExpiredTitle"));
+    setIsScanning(false);
+    disconnectRef.current();
+    setShowSessionExpired(true);
+    toast.error(t("sessionExpiredToast"), { duration: 4000 });
+  }, [t]);
+
+  const failScan = useCallback((scanId: string, error?: string) => {
+    if (currentScanIdRef.current !== scanId || terminalScanIdRef.current === scanId) return;
+    terminalScanIdRef.current = scanId;
+    const message = error ?? t("scanFailed");
+    setScanStatus(`${t("errorPrefix")} ${message}`);
+    setIsScanning(false);
+    disconnectRef.current();
+    toast.error(message);
+  }, [t]);
+
   const handleSocketMessage = useCallback((message: WebSocketMessage) => {
+    if (
+      message.scan_id !== currentScanIdRef.current ||
+      terminalScanIdRef.current === message.scan_id
+    ) return;
+    const lastSequence = lastSequenceByScanRef.current.get(message.scan_id) ?? 0;
+    if (message.sequence <= lastSequence) return;
+    lastSequenceByScanRef.current.set(message.scan_id, message.sequence);
+
     if (message.type === "started") {
       setTotalFiles(message.total_files);
       setScanStatus(t("connected"));
     } else if (message.type === "progress") {
+      const resultKey = `${message.file_id}\u0000${message.status}`;
+      if (consumedFileResultsRef.current.has(resultKey)) return;
+      consumedFileResultsRef.current.add(resultKey);
       const label = message.status === "no_face_found" ? t("noFace") : t("noMatch");
       setScanStatus(`${label}: ${message.file_name}`);
       setProcessedCount((prev) => prev + 1);
       setCurrentFile(message.file_name);
     } else if (message.type === "match") {
+      const resultKey = `${message.file_id}\u0000${message.status}`;
+      if (consumedFileResultsRef.current.has(resultKey)) return;
+      consumedFileResultsRef.current.add(resultKey);
       setMatches((prev) => [...prev, message]);
       setProcessedCount((prev) => prev + 1);
       setCurrentFile(message.file_name);
       setScanStatus(`${t("matchFoundStatus")} ${message.file_name}`);
       toast.success(`${t("matchFound")} ${message.file_name}`);
     } else if (message.type === "error") {
-      setScanStatus(`${t("errorPrefix")} ${message.error}`);
-      toast.error(message.error);
+      if (message.status === "failed") {
+        failScan(message.scan_id, message.error);
+      } else {
+        setScanStatus(`${t("errorPrefix")} ${message.error}`);
+        toast.error(message.error);
+      }
     } else if (message.type === "token_expired") {
-      setScanStatus(t("sessionExpiredTitle"));
-      toast.error(t("sessionExpiredToast"), { duration: 4000 });
-      setTimeout(() => {
-        setIsScanning(false);
-        disconnectRef.current();
-        setShowSessionExpired(true);
-      }, 500);
+      expireScan(message.scan_id);
     } else if (message.type === "completed") {
-      setScanStatus(t("scanComplete"));
-      setTimeout(() => {
-        setIsScanning(false);
-        disconnectRef.current();
-      }, 0);
-      toast.success(t("scanComplete"), { duration: 3000 });
+      completeScan(message.scan_id);
     }
-  }, [t]);
+  }, [completeScan, expireScan, failScan, t]);
 
   const { isConnected, error: wsError, connect, disconnect } = useScanSocket(
     import.meta.env.VITE_WS_URL,
     handleSocketMessage
   );
+  const isConnectedRef = useRef(isConnected);
+  useEffect(() => { isConnectedRef.current = isConnected; }, [isConnected]);
   useEffect(() => { disconnectRef.current = disconnect; }, [disconnect]);
 
   useEffect(() => {
     if (wsError) {
       toast.error(wsError);
-      setTimeout(() => setIsScanning(false), 0);
+      // Once POST has started a scan, polling remains the lifecycle fallback.
+      if (!currentScanId) setTimeout(() => setIsScanning(false), 0);
     }
-  }, [wsError]);
+  }, [wsError, currentScanId]);
 
   const handleStartScan = async () => {
     if (!selectedFile || !driveLink || !authState.accessToken) {
@@ -97,15 +142,38 @@ export default function Home() {
     setTotalFiles(0);
     setCurrentFile("");
     setCurrentScanId(null);
+    currentScanIdRef.current = null;
+    terminalScanIdRef.current = null;
+    lastSequenceByScanRef.current.clear();
+    consumedFileResultsRef.current.clear();
+    connectionInFlightRef.current = false;
+    setReconnectAttempt(0);
 
     try {
-      await connect();
       setScanStatus(t("initializing"));
       const response = await startScan(driveLink, selectedFile, authState.accessToken);
       setTotalFiles(response.total_files);
       setCurrentScanId(response.scan_id);
+      currentScanIdRef.current = response.scan_id;
+      lastSequenceByScanRef.current.set(response.scan_id, 0);
       setScanStatus(t("connected"));
       toast.info(`${t("scanStarted")} ${response.total_files} ${t("filesToProcess")}`);
+
+      // The scan exists only after POST returns its ID. The scoped socket replays
+      // from sequence zero, while polling independently reconciles lifecycle state.
+      connectionInFlightRef.current = true;
+      try {
+        await connect(response.scan_id, 0);
+      } catch (err) {
+        console.error("WebSocket connection error; continuing with status polling", err);
+        if (
+          currentScanIdRef.current === response.scan_id &&
+          terminalScanIdRef.current !== response.scan_id
+        ) setScanStatus(t("connecting"));
+      } finally {
+        connectionInFlightRef.current = false;
+        setReconnectAttempt((attempt) => attempt + 1);
+      }
     } catch (err) {
       if (err instanceof AuthError) {
         setScanStatus(t("sessionExpiredTitle"));
@@ -125,29 +193,97 @@ export default function Home() {
   };
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (isScanning && !isConnected && currentScanId) {
-      interval = setInterval(async () => {
-        try {
-          const res = await fetchScanStatus(currentScanId);
-          if (res.status === "completed") {
-            setScanStatus(t("scanComplete"));
-            setTimeout(() => {
-              setIsScanning(false);
-              disconnectRef.current();
-            }, 0);
-            toast.success(t("scanComplete"), { duration: 3000 });
-            clearInterval(interval);
+    if (
+      !isScanning ||
+      !currentScanId ||
+      isConnected ||
+      connectionInFlightRef.current ||
+      terminalScanIdRef.current === currentScanId
+    ) return;
+
+    const scanId = currentScanId;
+    const timeout = setTimeout(() => {
+      if (
+        currentScanIdRef.current !== scanId ||
+        terminalScanIdRef.current === scanId ||
+        connectionInFlightRef.current
+      ) return;
+
+      connectionInFlightRef.current = true;
+      const afterSequence = lastSequenceByScanRef.current.get(scanId) ?? 0;
+      void connect(scanId, afterSequence)
+        .catch((err) => console.error("WebSocket reconnect error; polling remains active", err))
+        .finally(() => {
+          connectionInFlightRef.current = false;
+          setReconnectAttempt((attempt) => attempt + 1);
+        });
+    }, 3000);
+
+    return () => clearTimeout(timeout);
+  }, [connect, currentScanId, isConnected, isScanning, reconnectAttempt]);
+
+  useEffect(() => {
+    if (!isScanning || !currentScanId) return;
+
+    const scanId = currentScanId;
+    const controller = new AbortController();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const isCurrent = () =>
+      !controller.signal.aborted &&
+      currentScanIdRef.current === scanId &&
+      terminalScanIdRef.current !== scanId;
+    const scheduleNext = () => {
+      if (isCurrent()) timeout = setTimeout(() => void poll(), 3000);
+    };
+    const poll = async () => {
+      try {
+        const res = await fetchScanStatus(scanId, controller.signal);
+        if (!isCurrent()) return;
+        if (res.scan_id !== scanId) {
+          scheduleNext();
+          return;
+        }
+
+        if (
+          res.status === "completed" ||
+          res.status === "token_expired" ||
+          res.status === "failed"
+        ) {
+          const localSequence = lastSequenceByScanRef.current.get(scanId) ?? 0;
+          if (localSequence >= res.last_sequence) {
+            if (res.status === "completed") completeScan(scanId);
+            else if (res.status === "token_expired") expireScan(scanId);
+            else failScan(scanId);
           } else {
+            // A terminal status is only a replay barrier. Keep the socket alive
+            // (or reconnecting) until every persisted event, including the ordered
+            // terminal event, has advanced the local cursor to last_sequence.
+            if (!isConnectedRef.current && isCurrent()) setScanStatus(t("connecting"));
+            scheduleNext();
+          }
+        } else if (res.status === "unknown") {
+          failScan(scanId);
+        } else {
+          // Polling remains lifecycle-only; file results are recovered by the
+          // WebSocket replay cursor without allowing polling to duplicate them.
+          if (!isConnectedRef.current && isCurrent()) {
             setScanStatus(`${t("connecting")}... (${res.remaining} ${t("filesToProcess")})`);
           }
-        } catch (err) {
-          console.error("Polling error", err);
+          scheduleNext();
         }
-      }, 3000);
-    }
-    return () => clearInterval(interval);
-  }, [isScanning, isConnected, currentScanId, t]);
+      } catch (err) {
+        if (controller.signal.aborted || !isCurrent()) return;
+        console.error("Polling error", err);
+        scheduleNext();
+      }
+    };
+
+    void poll();
+    return () => {
+      controller.abort();
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [completeScan, currentScanId, expireScan, failScan, isScanning, t]);
 
   const handleSessionExpiredLogin = useCallback(() => {
     setShowSessionExpired(false);

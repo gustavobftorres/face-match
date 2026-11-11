@@ -1,3 +1,5 @@
+import { ScanStatusResponse } from "@/lib/types";
+
 const API_URL = import.meta.env.VITE_API_URL;
 
 export class AuthError extends Error {
@@ -68,10 +70,10 @@ export async function startScan(
   return response.json() as Promise<{ message: string; total_files: number; scan_id: string }>;
 }
 
-export async function fetchScanStatus(scanId: string): Promise<{ status: "running" | "completed"; remaining: number }> {
-  const response = await fetch(`${API_URL}/api/v1/scan/${scanId}/status`);
+export async function fetchScanStatus(scanId: string, signal?: AbortSignal): Promise<ScanStatusResponse> {
+  const response = await fetch(`${API_URL}/api/v1/scan/${scanId}/status`, { signal });
   if (!response.ok) {
     throw new Error("Failed to fetch scan status");
   }
-  return response.json();
+  return response.json() as Promise<ScanStatusResponse>;
 }

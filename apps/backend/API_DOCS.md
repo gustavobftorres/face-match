@@ -17,10 +17,14 @@
 
 **Response `200 OK`:**
 ```json
-{ "url": "https://accounts.google.com/o/oauth2/auth?..." }
+{
+  "url": "https://accounts.google.com/o/oauth2/auth?...",
+  "code_verifier": "<pkce_code_verifier>"
+}
 ```
 
-Redirect the user to this URL to initiate the OAuth consent screen.
+Store `code_verifier` temporarily, then redirect the user to `url` to initiate
+the OAuth consent screen.
 
 ---
 
@@ -30,7 +34,10 @@ Redirect the user to this URL to initiate the OAuth consent screen.
 
 **Request Body:**
 ```json
-{ "code": "<authorization_code_from_google>" }
+{
+  "code": "<authorization_code_from_google>",
+  "code_verifier": "<pkce_code_verifier_from_step_1>"
+}
 ```
 
 **Response `200 OK`:**
@@ -67,7 +74,7 @@ Redirect the user to this URL to initiate the OAuth consent screen.
 }
 ```
 
-> Use `scan_id` to correlate WebSocket events to a specific scan session.
+> Use `scan_id` to open the scan-specific WebSocket and poll its status.
 
 **Errors:**
 
@@ -82,9 +89,17 @@ Redirect the user to this URL to initiate the OAuth consent screen.
 
 ## 4. Real-time Updates (WebSocket)
 
-**`WS /ws/updates`**
+**`WS /ws/updates/{scan_id}?after_sequence=0`**
 
-Connect immediately after calling `/scan`. All events from all active scans are broadcast on this channel. Use `scan_id` to filter events relevant to your session.
+Connect immediately after calling `/scan`. Each socket subscribes only to the
+requested scan. Every event contains that `scan_id` and a monotonically
+increasing `sequence` number.
+
+On first connection, omit `after_sequence` or use `0`. On reconnect, pass the
+last sequence processed by the client. The server first replays persisted events
+whose `sequence` is greater than `after_sequence`, then continues with live
+events from the same scan. Clients should retain the greatest processed sequence
+and ignore duplicate or older events defensively.
 
 ### Event Types
 
@@ -94,6 +109,7 @@ Emitted once when a scan begins.
 {
   "type": "started",
   "scan_id": "...",
+  "sequence": 1,
   "total_files": 150
 }
 ```
@@ -103,6 +119,8 @@ Emitted for each processed file that is either not a match or has no face.
 ```json
 {
   "type": "progress",
+  "scan_id": "...",
+  "sequence": 2,
   "file_id": "...",
   "file_name": "photo.jpg",
   "status": "no_match" | "no_face_found"
@@ -114,6 +132,8 @@ Emitted when the target face is found in an image.
 ```json
 {
   "type": "match",
+  "scan_id": "...",
+  "sequence": 3,
   "file_id": "...",
   "file_name": "photo.jpg",
   "status": "match",
@@ -126,7 +146,8 @@ Emitted once when all files in the scan have been processed (including errored/t
 ```json
 {
   "type": "completed",
-  "scan_id": "..."
+  "scan_id": "...",
+  "sequence": 151
 }
 ```
 
@@ -135,17 +156,36 @@ Emitted when a single file fails to process (download error, decoding failure, e
 ```json
 {
   "type": "error",
+  "scan_id": "...",
+  "sequence": 4,
   "file_id": "...",
   "file_name": "photo.jpg",
   "error": "Download timed out after retries"
 }
 ```
 
+A coordination failure that terminates the entire scan uses the same event type
+with a terminal status and no file fields:
+
+```json
+{
+  "type": "error",
+  "scan_id": "...",
+  "sequence": 5,
+  "status": "failed",
+  "error": "Scan state expired before a file could be processed"
+}
+```
+
 #### `token_expired`
-Emitted when the Google access token expires mid-scan. All remaining tasks are purged. The user must re-authenticate.
+Emitted once when the Google access token expires mid-scan. That scan enters the
+terminal `token_expired` state, so its later tasks do not publish normal results.
+The user must re-authenticate and start a new scan.
 ```json
 {
   "type": "token_expired",
+  "scan_id": "...",
+  "sequence": 6,
   "message": "Google token expired. Please re-authenticate and restart the scan."
 }
 ```
@@ -156,14 +196,22 @@ Emitted when the Google access token expires mid-scan. All remaining tasks are p
 
 **`GET /scan/{scan_id}/status`**
 
-Use this as a fallback if the WebSocket connection drops before the `completed` event is received. The status is persisted in Redis for 1 hour after a scan finishes.
+Use this as a fallback if the WebSocket connection drops. `last_sequence` is the
+latest event cursor known by Redis; use it to track progress and reconnect the
+WebSocket with `after_sequence`. Scan state and event history have a one-hour
+TTL.
 
-**Response `200 OK`:**
+**Response `200 OK` examples:**
 ```json
-{ "scan_id": "...", "status": "completed", "remaining": 0 }
-{ "scan_id": "...", "status": "running",   "remaining": 42 }
-{ "scan_id": "...", "status": "unknown" }
+{ "scan_id": "...", "status": "running",       "remaining": 42, "last_sequence": 17 }
+{ "scan_id": "...", "status": "completed",     "remaining": 0,  "last_sequence": 151 }
+{ "scan_id": "...", "status": "token_expired", "remaining": 0,  "last_sequence": 23 }
+{ "scan_id": "...", "status": "failed",        "remaining": 0,  "last_sequence": 8 }
+{ "scan_id": "...", "status": "unknown",                        "last_sequence": 0 }
 ```
+
+The possible states are `running`, `completed`, `token_expired`, `failed`, and
+`unknown`. `unknown` means no active or retained state exists for that scan ID.
 
 ---
 
@@ -171,6 +219,15 @@ Use this as a fallback if the WebSocket connection drops before the `completed` 
 
 - **Retry behavior:** All network-level errors (timeouts, SSL EOF, connection resets) are retried up to **3 times** with exponential backoff. Permanent failures emit an `error` event.
 - **SSL/Transport errors:** `[SSL: UNEXPECTED_EOF_WHILE_READING]`, connection resets, and dropped connections during download are all retried automatically.
-- **Face matching:** Distance threshold of `0.45` (stricter than the library default `0.6`) to minimize false positives.
+- **Face matching:** The production distance threshold is currently `0.6`; a
+  face matches when its distance is strictly less than that value. Images are
+  resized to at most `1000 px` on their longest side before encoding.
 - **Large scans:** Worker process is recycled every 50 tasks to prevent memory growth. Only 1 task is prefetched at a time.
-- **WebSocket reconnect:** If the WebSocket disconnects mid-scan, poll `GET /scan/{scan_id}/status` to check if the scan completed.
+- **Task limits:** The Celery soft time limit is `360 s`; the hard limit is
+  `420 s`.
+- **Redis isolation:** Counters, status, processed-file sets, event history,
+  sequence counters, and pub/sub channels are scoped by `scan_id`. Terminal
+  states are `completed`, `token_expired`, and `failed`.
+- **WebSocket reconnect:** Poll `GET /scan/{scan_id}/status`, retain its
+  `last_sequence`, and reconnect to
+  `/ws/updates/{scan_id}?after_sequence=<last_processed_sequence>`.

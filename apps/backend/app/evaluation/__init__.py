@@ -1,11 +1,12 @@
 """Offline, reproducible comparison of face-search implementations."""
 
 from .manifest import ManifestError, load_manifest, validate_manifest
-from .face_search import FaceSearchAdapter
+from .face_search import DlibProductionAdapter, FaceSearchAdapter
 from .models import (
     EvaluationManifest,
     EvaluationMetrics,
     EvaluationPlan,
+    DecisionPolicy,
     EvaluationRun,
     FaceScore,
     MatchDecision,
@@ -14,12 +15,14 @@ from .models import (
     SearchResult,
     SystemRun,
 )
-from .runner import AdapterOutputError, compare
+from .runner import AdapterOutputError, compare, evaluate_baseline
 
 __all__ = [
     "EvaluationManifest",
     "EvaluationMetrics",
     "EvaluationPlan",
+    "DecisionPolicy",
+    "DlibProductionAdapter",
     "EvaluationRun",
     "FaceScore",
     "FaceSearchAdapter",
@@ -29,6 +32,7 @@ __all__ = [
     "SearchResult",
     "SystemRun",
     "compare",
+    "evaluate_baseline",
     "load_manifest",
     "ManifestError",
     "validate_manifest",

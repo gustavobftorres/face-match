@@ -21,8 +21,11 @@ without using a test set to tune their behavior.
   Scans, including their `calibration` or `test` split and ground truth.
 - **Evaluation Run**: one comparison in which baseline and candidate receive
   the same Scans and produce a durable artifact bundle.
-- **Match Decision**: evaluator-owned interpretation of scores using a threshold
-  calibrated on `calibration` and then frozen for `test`. Its result is
+- **Decision Policy**: per-role rule: `calibrate_f1` selects a threshold on
+  `calibration`; `production_distance` uses a fixed raw distance threshold
+  (default `0.6`). Both are frozen for `test`.
+- **Match Decision**: evaluator-owned interpretation of scores using a Decision
+  Policy. Its result is
   `match`, `no_match`, `no_face`, or `error`.
 
 ## Evaluation rules
@@ -39,6 +42,11 @@ without using a test set to tune their behavior.
   Images represent that identity. Scores are finite and higher-is-better; only
   the evaluator creates a Match Decision.
 - Test data never selects or changes a threshold.
+- Production distance uses `-distance` scores and strict `> -threshold`;
+  the default calibrated adapter uses legacy `1 - distance` scores and `>=`.
+  The production adapter requires one reference per identity and uses that
+  reference's first encoded face. The example comparison changes policy with
+  the same underlying model; it does not establish a model improvement.
 - Errors are reported separately from image-level TP/FP/FN/TN.
 
 ## Example dialogue
@@ -47,8 +55,9 @@ without using a test set to tune their behavior.
 > Evaluation Manifest.
 >
 > **Evaluator:** The calibration and test identities are disjoint. I will give
-> both systems the same Scans, calibrate each threshold only on calibration,
-> freeze it for test, and write the Evaluation Run artifacts.
+> both systems the same Scans, select F1 thresholds only on calibration, retain
+> fixed production thresholds, freeze both for test, and write the Evaluation
+> Run artifacts with input hashes and available code/runtime provenance.
 >
 > **Operator:** Did the candidate treat a photo without a detectable face as a
 > failed match?

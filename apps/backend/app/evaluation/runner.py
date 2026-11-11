@@ -41,8 +41,18 @@ def compare(
     baseline: SearchAdapter,
     candidate: SearchAdapter,
 ) -> EvaluationRun:
-    validate_manifest(plan.manifest)
-    adapters = (("baseline", baseline), ("candidate", candidate))
+    return _evaluate(plan, (("baseline", baseline), ("candidate", candidate)))
+
+
+def evaluate_baseline(plan: EvaluationPlan, baseline: SearchAdapter) -> EvaluationRun:
+    """Evaluate one baseline with real per-scan timings and no candidate run."""
+    return _evaluate(plan, (("baseline", baseline),))
+
+
+def _evaluate(
+    plan: EvaluationPlan, adapters: tuple[tuple[str, SearchAdapter], ...]
+) -> EvaluationRun:
+    validate_manifest(plan.manifest, mode=plan.mode)
     provenance = collect_provenance(plan, adapters)
     calibration_scans = tuple(
         scan for scan in plan.manifest.scans if scan.split == "calibration"
@@ -84,6 +94,7 @@ def compare(
         output_dir=plan.output_dir,
         systems=systems,
         provenance=provenance,
+        evaluation_mode=plan.mode,
     )
     write_run_bundle(run, plan.manifest)
     return run

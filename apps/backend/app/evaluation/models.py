@@ -69,10 +69,17 @@ class EvaluationPlan:
     baseline: DecisionPolicy = field(default_factory=DecisionPolicy)
     candidate: DecisionPolicy = field(default_factory=DecisionPolicy)
     adapter_config: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    mode: Literal["calibration_test", "test_only"] = "calibration_test"
 
     def __post_init__(self) -> None:
         if not isinstance(self.baseline, DecisionPolicy) or not isinstance(self.candidate, DecisionPolicy):
             raise ValueError("baseline and candidate must be DecisionPolicy values")
+        if self.mode not in ("calibration_test", "test_only"):
+            raise ValueError(f"unknown evaluation mode: {self.mode}")
+        if self.mode == "test_only" and any(
+            policy.policy != "production_distance" for policy in (self.baseline, self.candidate)
+        ):
+            raise ValueError("test_only requires production_distance policies for baseline and candidate")
         if (not isinstance(self.adapter_config, dict)
                 or set(self.adapter_config) - {"baseline", "candidate"}
                 or not all(isinstance(value, dict) for value in self.adapter_config.values())):
@@ -144,3 +151,4 @@ class EvaluationRun:
     output_dir: Path
     systems: Mapping[str, SystemRun] = field(default_factory=dict)
     provenance: Mapping[str, Any] = field(default_factory=dict)
+    evaluation_mode: str = "calibration_test"

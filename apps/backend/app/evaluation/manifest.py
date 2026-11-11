@@ -12,7 +12,7 @@ class ManifestError(ValueError):
     """The evaluation manifest is invalid or unsafe to evaluate."""
 
 
-def load_manifest(path: str | Path) -> EvaluationManifest:
+def load_manifest(path: str | Path, *, mode: str = "calibration_test") -> EvaluationManifest:
     manifest_path = Path(path).resolve()
     with manifest_path.open("rb") as stream:
         document = tomllib.load(stream)
@@ -43,11 +43,13 @@ def load_manifest(path: str | Path) -> EvaluationManifest:
         references=references,
         scans=scans,
     )
-    validate_manifest(manifest)
+    validate_manifest(manifest, mode=mode)
     return manifest
 
 
-def validate_manifest(manifest: EvaluationManifest) -> None:
+def validate_manifest(manifest: EvaluationManifest, *, mode: str = "calibration_test") -> None:
+    if mode not in ("calibration_test", "test_only"):
+        raise ManifestError(f"unknown evaluation mode: {mode}")
     if not isinstance(manifest, EvaluationManifest):
         raise ManifestError("manifest must be an EvaluationManifest")
     if not isinstance(manifest.media_root, Path):
@@ -102,7 +104,12 @@ def validate_manifest(manifest: EvaluationManifest) -> None:
                 f"scan {scan.id!r} has identities without a {scan.split} reference: "
                 f"{', '.join(sorted(missing))}"
             )
-    if not all(scans_by_split.values()):
+    if mode == "test_only":
+        if scans_by_split["calibration"] or references_by_split["calibration"]:
+            raise ManifestError("test_only accepts only test references and scans")
+        if not scans_by_split["test"]:
+            raise ManifestError("test_only needs test scans")
+    elif not all(scans_by_split.values()):
         raise ManifestError("manifest needs calibration and test scans")
     overlap = identities_by_split["calibration"] & identities_by_split["test"]
     if overlap:

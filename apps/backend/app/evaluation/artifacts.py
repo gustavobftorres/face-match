@@ -43,6 +43,7 @@ def _write_bundle_files(
             "schema_version": 1,
             "run_id": run.run_id,
             "created_at": run.created_at,
+            "evaluation_mode": run.evaluation_mode,
             "manifest": {
                 "references": len(manifest.references),
                 "scans": len(manifest.scans),
@@ -91,6 +92,7 @@ def _write_bundle_files(
         output_dir / "metrics.json",
         {
             "split": "test",
+            "evaluation_mode": run.evaluation_mode,
             "systems": {
                 role: {"name": system.name, **asdict(system.metrics)}
                 for role, system in run.systems.items()
@@ -110,6 +112,12 @@ def _report(run: EvaluationRun) -> str:
         "| System | Threshold | Precision | Recall | FPIR | FNIR | TPIR | p95 ms |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
+    if run.evaluation_mode == "test_only":
+        lines[2] = (
+            f"Run `{run.run_id}`. Mode `test_only`: holdout evaluation with fixed production "
+            "distance thresholds; no calibration or threshold selection used these labels. "
+            "Results describe this corpus and do not establish generalization to other identities or datasets."
+        )
     for role, system in run.systems.items():
         metrics = system.metrics
         threshold = f"{system.threshold:.6g}" if isfinite(system.threshold) else "none"

@@ -104,6 +104,29 @@ file content reused across the two splits. The manifest must include scans in
 both splits. Keep evaluation photos private and outside source control; the CLI
 only needs local paths and does not upload the dataset.
 
+## Fixed-policy holdout without calibration identities
+
+For a reviewed corpus with no separate calibration identities, explicitly set
+`mode = "test_only"` at the config's top level and use
+`policy = "production_distance"` for both roles (default distance threshold
+`0.6`). Every reference and scan in that manifest must use `split = "test"`;
+calibration references/scans and `calibrate_f1` policies are rejected before
+adapter factories run. Do not duplicate identities or manufacture a calibration
+split. The manifest schema remains version 1.
+
+Python callers use `load_manifest(path, mode="test_only")` and
+`EvaluationPlan(..., mode="test_only", baseline=DecisionPolicy("production_distance"),
+candidate=DecisionPolicy("production_distance"))`. The default mode,
+`calibration_test`, continues to require identity-disjoint calibration and test
+scans, including when policies have fixed thresholds.
+
+Test-only evaluation applies the fixed strict distance boundary and uses labels
+only to compute metrics. Artifacts identify `evaluation_mode = "test_only"`
+and report no calibration source for fixed policies. These holdout results
+describe the reviewed corpus; they do not establish generalization to other
+identities or datasets. Once results guide model or threshold changes, retain a
+new independent test corpus for evaluating those changes.
+
 ## Calibration and test
 
 For each `calibrate_f1` role, the runner evaluates calibration scans and chooses the

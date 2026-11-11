@@ -17,12 +17,13 @@ def main(argv: list[str] | None = None) -> int:
     config_path = args.config.resolve()
     with config_path.open("rb") as stream:
         config = tomllib.load(stream)
-    _known_fields(config, {"manifest", "output_dir", "baseline", "candidate"}, "config")
+    _known_fields(config, {"manifest", "output_dir", "baseline", "candidate", "mode"}, "config")
+    mode = config.get("mode", "calibration_test")
     policies = {role: _policy(config.get(role), role) for role in ("baseline", "candidate")}
     manifest_path = _relative_path(config_path, _required_text(config, "manifest"))
     output_dir = _relative_path(config_path, _required_text(config, "output_dir"))
     plan = EvaluationPlan(
-        load_manifest(manifest_path), output_dir, **policies,
+        load_manifest(manifest_path, mode=mode), output_dir, **policies, mode=mode,
         adapter_config={role: config[role] for role in ("baseline", "candidate")},
     )
     baseline = _adapter(config.get("baseline"), "baseline")

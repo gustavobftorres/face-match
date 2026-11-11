@@ -15,7 +15,7 @@ from .models import (
     SearchResult,
     SystemRun,
 )
-from .runner import AdapterOutputError, compare
+from .runner import AdapterOutputError, compare, evaluate_baseline
 
 __all__ = [
     "EvaluationManifest",
@@ -32,6 +32,7 @@ __all__ = [
     "SearchResult",
     "SystemRun",
     "compare",
+    "evaluate_baseline",
     "load_manifest",
     "ManifestError",
     "validate_manifest",

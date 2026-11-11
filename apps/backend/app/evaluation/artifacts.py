@@ -51,6 +51,7 @@ def _write_bundle_files(
                 "identity_disjoint": True,
             },
             "systems": system_summary,
+            "provenance": run.provenance,
         },
     )
     _write_json(
@@ -59,7 +60,11 @@ def _write_bundle_files(
             role: {
                 "name": system.name,
                 "threshold": _finite_or_none(system.threshold),
-                "calibrated_on": "calibration",
+                "policy": system.decision_policy.policy,
+                "comparator": system.decision_policy.comparator,
+                "score_semantics": system.decision_policy.score_semantics,
+                "distance_threshold": system.decision_policy.threshold,
+                "calibrated_on": "calibration" if system.decision_policy.policy == "calibrate_f1" else None,
                 "frozen_on": "test",
             }
             for role, system in run.systems.items()
@@ -100,7 +105,7 @@ def _report(run: EvaluationRun) -> str:
     lines = [
         "# Face Search Evaluation",
         "",
-        f"Run `{run.run_id}`. Thresholds were calibrated on calibration only and frozen for test.",
+        f"Run `{run.run_id}`. F1 thresholds use calibration only; production distance thresholds are fixed. All thresholds are frozen for test.",
         "",
         "| System | Threshold | Precision | Recall | FPIR | FNIR | TPIR | p95 ms |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
@@ -112,6 +117,14 @@ def _report(run: EvaluationRun) -> str:
             f"| {role} ({system.name}) | {threshold} | {metrics.precision:.4f} | "
             f"{metrics.recall:.4f} | {metrics.fpir:.4f} | {metrics.fnir:.4f} | "
             f"{metrics.tpir:.4f} | {metrics.latency_ms['p95']:.3f} |"
+        )
+    lines.extend(["", "Decision policies:", ""])
+    for role, system in run.systems.items():
+        policy = system.decision_policy
+        lines.append(
+            f"- {role}: `{policy.policy}`, score semantics `{policy.score_semantics}`, "
+            f"comparator `{policy.comparator}`, score threshold `{system.threshold}`; "
+            f"distance threshold `{policy.threshold}`. Adapter `{system.adapter_identity}`."
         )
     lines.extend(
         [

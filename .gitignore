@@ -14,3 +14,13 @@ node_modules/
 # General
 .DS_Store
 *.log
+
+# Private offline evaluation inputs and generated artifacts (at any depth).
+evaluation-media/
+evaluation-runs/
+evaluation.toml
+evaluation.local.toml
+evaluation-*.local.toml
+evaluation-manifest.toml
+evaluation-manifest-*.toml
+!evaluation-manifest.example.toml

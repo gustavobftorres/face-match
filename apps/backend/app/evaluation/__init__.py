@@ -1,11 +1,12 @@
 """Offline, reproducible comparison of face-search implementations."""
 
 from .manifest import ManifestError, load_manifest, validate_manifest
-from .face_search import FaceSearchAdapter
+from .face_search import DlibProductionAdapter, FaceSearchAdapter
 from .models import (
     EvaluationManifest,
     EvaluationMetrics,
     EvaluationPlan,
+    DecisionPolicy,
     EvaluationRun,
     FaceScore,
     MatchDecision,
@@ -20,6 +21,8 @@ __all__ = [
     "EvaluationManifest",
     "EvaluationMetrics",
     "EvaluationPlan",
+    "DecisionPolicy",
+    "DlibProductionAdapter",
     "EvaluationRun",
     "FaceScore",
     "FaceSearchAdapter",

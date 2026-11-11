@@ -64,6 +64,43 @@ class FaceSearchAdapter:
             )
 
 
+class DlibProductionAdapter(FaceSearchAdapter):
+    """Production's first reference encoding and any scan face, as -distance.
+
+    Negating the distance preserves the strict 0.6 boundary exactly; subtracting
+    it from one can round adjacent floats to the same similarity score.
+    """
+
+    score_semantics = "negative_distance"
+
+    def __init__(self, name: str = "dlib-production", **options) -> None:
+        super().__init__(name, **options)
+
+    def search(self, gallery: Sequence[ReferenceImage], scan: Scan) -> SearchResult:
+        try:
+            identities = [reference.identity_id for reference in gallery]
+            if len(set(identities)) != len(identities):
+                raise ValueError("production requires one reference per identity")
+            unknown = tuple(self._encoder(scan.path.read_bytes()))
+            if not unknown:
+                return SearchResult(False, score_semantics=self.score_semantics)
+            scores = []
+            for reference in gallery:
+                encodings = self._reference_cache.get(reference.path)
+                if encodings is None:
+                    encodings = tuple(self._encoder(reference.path.read_bytes()))
+                    self._reference_cache[reference.path] = encodings
+                if not encodings:
+                    raise ValueError(f"reference image has no face: {reference.id}")
+                scores.append(FaceScore(reference.identity_id, max(
+                    -float(self._distance(encodings[0], observed)) for observed in unknown
+                )))
+            return SearchResult(True, tuple(scores), score_semantics=self.score_semantics)
+        except Exception as exc:
+            return SearchResult(False, error=f"{type(exc).__name__}: {exc}",
+                                score_semantics=self.score_semantics)
+
+
 def _default_encoder(content: bytes) -> Sequence[Encoding]:
     from app.services.ai_service import get_face_encodings
 

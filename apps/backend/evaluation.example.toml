@@ -3,11 +3,15 @@ manifest = "evaluation-manifest.toml"
 output_dir = "evaluation-runs/example"
 
 [baseline]
-name = "face-search-baseline"
-# Omit factory to use app.evaluation.FaceSearchAdapter.
+name = "dlib-production-baseline"
+policy = "production_distance"
+threshold = 0.6 # Strict distance < 0.6; score is -distance, comparator > -0.6.
+# Omit factory to select DlibProductionAdapter for this policy.
+# Requires exactly one reference per identity and uses its first face only.
 
 [candidate]
 name = "face-search-candidate"
+policy = "calibrate_f1" # Default when omitted; legacy 1-distance scores, >= threshold.
 # A custom adapter factory must return scores, never match decisions.
 # factory = "my_evaluation_adapters:create_candidate"
 # [candidate.options]

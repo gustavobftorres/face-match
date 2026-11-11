@@ -1,0 +1,41 @@
+# STRUCTURE ONLY: every path below is a fictitious placeholder, not bundled media.
+# Copy to evaluation-manifest.toml and replace media_root and all six paths.
+# The loader requires real local files; this example cannot run unchanged.
+version = 1
+media_root = "/REPLACE_WITH_PRIVATE_DIRECTORY_OUTSIDE_REPOSITORY/evaluation-media"
+
+[[references]]
+id = "cal-target-reference"
+identity = "target-calibration"
+path = "calibration/REPLACE_cal_reference.jpg"
+split = "calibration"
+
+[[references]]
+id = "test-target-reference"
+identity = "target-test"
+path = "test/REPLACE_test_reference.jpg"
+split = "test"
+
+[[scans]]
+id = "cal-positive"
+path = "calibration/REPLACE_cal_positive.jpg"
+split = "calibration"
+expected_identities = ["target-calibration"]
+
+[[scans]]
+id = "cal-negative"
+path = "calibration/REPLACE_cal_negative_other_people.jpg"
+split = "calibration"
+expected_identities = []
+
+[[scans]]
+id = "test-positive"
+path = "test/REPLACE_test_positive.jpg"
+split = "test"
+expected_identities = ["target-test"]
+
+[[scans]]
+id = "test-negative"
+path = "test/REPLACE_test_negative_other_people.jpg"
+split = "test"
+expected_identities = []

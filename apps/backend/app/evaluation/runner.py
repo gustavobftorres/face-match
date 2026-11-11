@@ -9,10 +9,12 @@ from uuid import uuid4
 
 from .artifacts import write_run_bundle
 from .manifest import validate_manifest
+from .provenance import collect_provenance
 from .models import (
     EvaluationPlan,
     EvaluationMetrics,
     EvaluationRun,
+    DecisionPolicy,
     FaceScore,
     MatchDecision,
     ReferenceImage,
@@ -41,6 +43,7 @@ def compare(
 ) -> EvaluationRun:
     validate_manifest(plan.manifest)
     adapters = (("baseline", baseline), ("candidate", candidate))
+    provenance = collect_provenance(plan, adapters)
     calibration_scans = tuple(
         scan for scan in plan.manifest.scans if scan.split == "calibration"
     )
@@ -48,38 +51,46 @@ def compare(
     observations_by_role: dict[str, list[_Observation]] = {}
     thresholds: dict[str, float] = {}
     for role, adapter in adapters:
+        policy = getattr(plan, role)
         observations_by_role[role] = [
-            _observe(plan, adapter, scan) for scan in calibration_scans
+            _observe(plan, adapter, scan, policy) for scan in calibration_scans
         ]
-        thresholds[role] = _calibrate_threshold(observations_by_role[role])
+        thresholds[role] = (
+            -float(policy.threshold) if policy.policy == "production_distance"
+            else _calibrate_threshold(observations_by_role[role])
+        )
     for role, adapter in adapters:
         observations_by_role[role].extend(
-            _observe(plan, adapter, scan) for scan in test_scans
+            _observe(plan, adapter, scan, getattr(plan, role)) for scan in test_scans
         )
 
     systems = {}
     for role, adapter in adapters:
         observations = observations_by_role[role]
         threshold = thresholds[role]
-        decisions = tuple(_decide(item, threshold) for item in observations)
+        policy = getattr(plan, role)
+        decisions = tuple(_decide(item, threshold, policy) for item in observations)
         systems[role] = SystemRun(
             name=adapter.name,
             threshold=threshold,
             metrics=_metrics(decisions),
             decisions=decisions,
+            decision_policy=policy,
+            adapter_identity=f"{type(adapter).__module__}:{type(adapter).__qualname__}",
         )
     run = EvaluationRun(
         run_id=uuid4().hex,
         created_at=datetime.now(UTC).isoformat(),
         output_dir=plan.output_dir,
         systems=systems,
+        provenance=provenance,
     )
     write_run_bundle(run, plan.manifest)
     return run
 
 
 def _observe(
-    plan: EvaluationPlan, adapter: SearchAdapter, scan: Scan
+    plan: EvaluationPlan, adapter: SearchAdapter, scan: Scan, policy: DecisionPolicy
 ) -> _Observation:
     gallery = tuple(
         reference
@@ -90,19 +101,20 @@ def _observe(
     try:
         result = adapter.search(gallery, scan)
     except Exception as exc:
-        result = SearchResult(has_face=False, error=f"{type(exc).__name__}: {exc}")
-    _validate_adapter_output(result, gallery)
+        result = SearchResult(has_face=False, error=f"{type(exc).__name__}: {exc}",
+                              score_semantics=policy.score_semantics)
+    _validate_adapter_output(result, gallery, policy.score_semantics)
     latency_ms = (perf_counter_ns() - started) / 1_000_000
     return _Observation(scan, result, latency_ms)
 
 
 def _validate_adapter_output(
-    result: object, gallery: Sequence[ReferenceImage]
+    result: object, gallery: Sequence[ReferenceImage], score_semantics: str = "higher_is_better"
 ) -> None:
     if not isinstance(result, SearchResult):
         raise AdapterOutputError("adapter must return SearchResult")
-    if result.score_semantics != "higher_is_better":
-        raise AdapterOutputError("score semantics must be higher_is_better")
+    if result.score_semantics != score_semantics:
+        raise AdapterOutputError(f"score semantics must be {score_semantics}")
     if not isinstance(result.has_face, bool):
         raise AdapterOutputError("has_face must be a boolean")
     if not isinstance(result.scores, tuple) or not all(
@@ -189,7 +201,7 @@ def _calibrate_threshold(observations: Sequence[_Observation]) -> float:
     return best_threshold
 
 
-def _decide(observation: _Observation, threshold: float) -> MatchDecision:
+def _decide(observation: _Observation, threshold: float, policy: DecisionPolicy) -> MatchDecision:
     result = observation.result
     if result.error:
         status = "error"
@@ -199,7 +211,8 @@ def _decide(observation: _Observation, threshold: float) -> MatchDecision:
         predicted = ()
     else:
         predicted = tuple(
-            score.identity_id for score in result.scores if score.score >= threshold
+            score.identity_id for score in result.scores
+            if (score.score > threshold if policy.comparator == ">" else score.score >= threshold)
         )
         status = "match" if predicted else "no_match"
     return MatchDecision(

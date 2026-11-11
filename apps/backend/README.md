@@ -72,4 +72,7 @@ This backend requires system-level C++ libraries (`cmake`, `libopenblas-dev`) fo
 
 ## Documentation
 - `API_DOCS.md` — Full API payloads and WebSocket event reference.
-- Module-specific documentation can be found in `README.md` files inside `app/core`, `app/services`, and `app/workers`.
+- `app/evaluation/README.md` — Offline baseline/candidate evaluation CLI,
+  manifest safety rules, and output artifacts.
+- Module-specific documentation can be found in `README.md` files inside
+  `app/core`, `app/services`, and `app/workers`.

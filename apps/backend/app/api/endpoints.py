@@ -11,7 +11,12 @@ from googleapiclient.errors import HttpError as DriveHttpError
 from app.schemas.requests import ScanRequest
 from app.services.drive_service import list_drive_files
 from app.services.ai_service import get_face_encodings
-from app.workers.tasks import process_image
+from app.workers.tasks import (
+    SCAN_EVENT_LUA,
+    SCAN_STATUS_TTL,
+    process_image,
+    scan_event_keys,
+)
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -51,12 +56,19 @@ async def start_scan(request: ScanRequest):
         redis_counter_key = f"scan_remaining:{scan_id}"
 
         redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
-        await redis_client.set(redis_counter_key, len(files), ex=3600)
-        await redis_client.publish("scan_updates", json.dumps({
-            "type": "started",
-            "scan_id": scan_id,
-            "total_files": len(files)
-        }))
+        await redis_client.set(redis_counter_key, len(files), ex=SCAN_STATUS_TTL)
+        event_keys = scan_event_keys(scan_id)
+        await redis_client.eval(
+            SCAN_EVENT_LUA,
+            len(event_keys),
+            *event_keys,
+            json.dumps({
+                "type": "started",
+                "scan_id": scan_id,
+                "total_files": len(files),
+            }),
+            SCAN_STATUS_TTL,
+        )
         await redis_client.aclose()
 
         for file in files:
@@ -92,13 +104,27 @@ async def start_scan(request: ScanRequest):
 async def get_scan_status(scan_id: str):
     redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
     try:
-        status = await redis_client.get(f"scan_status:{scan_id}")
-        remaining_str = await redis_client.get(f"scan_remaining:{scan_id}")
-        if status == "completed":
-            return {"scan_id": scan_id, "status": "completed", "remaining": 0}
+        status, remaining_str, sequence_str = await redis_client.mget(
+            f"scan_status:{scan_id}",
+            f"scan_remaining:{scan_id}",
+            f"scan_sequence:{scan_id}",
+        )
+        last_sequence = int(sequence_str) if sequence_str is not None else 0
+        if status in {"completed", "token_expired", "failed"}:
+            return {
+                "scan_id": scan_id,
+                "status": status,
+                "remaining": 0,
+                "last_sequence": last_sequence,
+            }
         if remaining_str is not None:
-            return {"scan_id": scan_id, "status": "running", "remaining": int(remaining_str)}
-        return {"scan_id": scan_id, "status": "unknown"}
+            return {
+                "scan_id": scan_id,
+                "status": "running",
+                "remaining": int(remaining_str),
+                "last_sequence": last_sequence,
+            }
+        return {"scan_id": scan_id, "status": "unknown", "last_sequence": last_sequence}
     finally:
         await redis_client.aclose()
 
@@ -121,21 +147,48 @@ async def get_drive_image(file_id: str, access_token: str):
     return StreamingResponse(stream_image(), media_type="image/jpeg")
 
 
-@router.websocket("/ws/updates")
-async def websocket_endpoint(websocket: WebSocket):
+@router.websocket("/ws/updates/{scan_id}")
+async def websocket_endpoint(websocket: WebSocket, scan_id: str, after_sequence: int = 0):
     await websocket.accept()
     redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
     pubsub = redis_client.pubsub()
-    await pubsub.subscribe("scan_updates")
+    channel = f"scan_updates:{scan_id}"
+    last_sequence = max(0, after_sequence)
 
     try:
+        await pubsub.subscribe(channel)
+        while True:
+            subscription = await pubsub.get_message(
+                ignore_subscribe_messages=False,
+                timeout=5.0,
+            )
+            if subscription is None:
+                raise TimeoutError(f"Timed out subscribing to {channel}")
+            if (
+                subscription["type"] == "subscribe"
+                and subscription["channel"] == channel
+            ):
+                break
+
+        persisted_events = await redis_client.lrange(f"scan_events:{scan_id}", 0, -1)
+        for encoded_event in persisted_events:
+            event = json.loads(encoded_event)
+            sequence = int(event["sequence"])
+            if sequence > last_sequence:
+                await websocket.send_text(encoded_event)
+                last_sequence = sequence
+
         async for message in pubsub.listen():
             if message["type"] == "message":
-                await websocket.send_text(message["data"])
+                event = json.loads(message["data"])
+                sequence = int(event["sequence"])
+                if sequence > last_sequence:
+                    await websocket.send_text(message["data"])
+                    last_sequence = sequence
     except WebSocketDisconnect:
         logger.info("WebSocket client disconnected")
     except Exception as e:
         logger.warning(f"WebSocket error: {e}")
     finally:
-        await pubsub.unsubscribe("scan_updates")
+        await pubsub.unsubscribe(channel)
         await redis_client.aclose()

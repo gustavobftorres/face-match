@@ -1,0 +1,14 @@
+# Copy this file, then point it at an identity-disjoint local manifest.
+manifest = "evaluation-manifest.toml"
+output_dir = "evaluation-runs/example"
+
+[baseline]
+name = "face-search-baseline"
+# Omit factory to use app.evaluation.FaceSearchAdapter.
+
+[candidate]
+name = "face-search-candidate"
+# A custom adapter factory must return scores, never match decisions.
+# factory = "my_evaluation_adapters:create_candidate"
+# [candidate.options]
+# model = "candidate-model"

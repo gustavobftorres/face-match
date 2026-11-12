@@ -1,0 +1,39 @@
+# Structure only: prepare the private collection described in
+# ../../docs/calibration-collection.md and replace every local path below.
+# Run from apps/backend with requirements.txt AND requirements-candidate.txt installed
+# in the same environment: the baseline also requires dlib/face_recognition.
+manifest = "evaluation-manifest.toml"
+output_dir = "evaluation-runs/yunet-auraface-calibration"
+mode = "calibration_test"
+
+[baseline]
+name = "dlib-production-baseline"
+policy = "production_distance"
+threshold = 0.6 # Existing production distance < 0.6, represented as score > -0.6.
+
+[candidate]
+name = "yunet-auraface-candidate"
+factory = "app.evaluation.yunet_auraface:YunetAuraFaceAdapter"
+policy = "calibrate_f1" # Chooses threshold using calibration labels only.
+
+[candidate.options]
+yunet_model_path = "/REPLACE_WITH_LOCAL_MODELS/face_detection_yunet_2023mar.onnx"
+auraface_model_path = "/REPLACE_WITH_LOCAL_MODELS/auraface/glintr100.onnx"
+# Optional expected hashes: replace with the independently verified local SHA-256.
+# yunet_sha256 = "REPLACE_WITH_64_HEX_CHARACTERS"
+# auraface_sha256 = "REPLACE_WITH_64_HEX_CHARACTERS"
+max_image_dimension = 1000
+detector_fallback_max_dimension = 320 # Fixed retry only after zero detections; confidence stays 0.9.
+providers = ["CPUExecutionProvider"]
+intra_op_threads = 1
+inter_op_threads = 1
+
+# Later, to evaluate the old target as a separate fixed descriptive benchmark:
+# - Copy this config, set mode = "test_only", use a test-only manifest and new output_dir.
+# - Keep the baseline production_distance policy above.
+# - Change candidate.policy to "fixed_similarity".
+# - Add candidate.threshold = <REPLACE_WITH_FROZEN_EXTERNAL_CALIBRATION_THRESHOLD>.
+#   This comment is deliberately a placeholder, not a runnable threshold recommendation.
+# - Add candidate.threshold_source = "external_calibration".
+# The source label is declarative: it does not load or verify another run's calibration.
+# Keep the model hashes and preprocessing options identical to the calibration run.

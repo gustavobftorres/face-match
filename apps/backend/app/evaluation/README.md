@@ -51,8 +51,39 @@ faces or references are allowed. No real benchmark result is supplied.
 To compare another implementation, set `factory = "module:attribute"`; the callable is
 constructed with `name` and any values in `[candidate.options]`. An adapter must
 return one finite, higher-is-better score per gallery identity and must not make
-its own thresholded match decision. No ONNX adapter is bundled or implied by the
-current CLI.
+its own thresholded match decision. The optional local-only
+`app.evaluation.yunet_auraface:YunetAuraFaceAdapter` uses YuNet detection and
+alignment with AuraFace cosine embeddings. For the candidate comparison example,
+install **both** `requirements.txt` and `requirements-candidate.txt` in the same
+environment: its Dlib baseline needs the base `dlib`/`face_recognition`
+dependencies. From `apps/backend`, in an activated separate environment:
+
+```sh
+python -m pip install -r requirements.txt -r requirements-candidate.txt
+```
+
+An existing backend development environment with working native baseline
+dependencies can instead install the optional candidate requirements. Installing
+only `requirements-candidate.txt` in a fresh environment supports candidate-only
+smoke checks, not this baseline/candidate comparison. Provide explicit local
+model paths; the adapter never downloads weights. The default image bound is
+1000 pixels; only when YuNet detects zero faces, it retries larger images at a
+320-pixel bound and maps landmarks back before alignment. Detector confidence
+remains `0.9`; recognition similarity has no default decision threshold.
+See the [candidate config](../../evaluation.candidate.example.toml)
+and [calibration guide](../../../../docs/calibration-collection.md).
+
+For the separate public calibration workflow, follow the
+[LFW protocol](../../../../docs/lfw-calibration.md) and review the
+[frozen calibration result](../../../../docs/lfw-calibration-result.md).
+Public pairs select the threshold before the private comparison; carry that
+unchanged value into `fixed_similarity` with
+`threshold_source = "external_calibration"` and `mode = "test_only"`.
+Private test labels then measure the fixed policy rather than selecting its
+threshold. YuNet/AuraFace remains an evaluation-only adapter: the production
+application has not migrated to this model or threshold.
+The [private comparison result](../../../../docs/yunet-auraface-comparison.md)
+records the aggregate tradeoffs and the decision to retain the production model.
 
 For a complete six-file placeholder manifest and manual ground-truth workflow,
 see [dataset preparation](../../../../docs/evaluation-dataset.md). The snippet
@@ -108,8 +139,12 @@ only needs local paths and does not upload the dataset.
 
 For a reviewed corpus with no separate calibration identities, explicitly set
 `mode = "test_only"` at the config's top level and use
-`policy = "production_distance"` for both roles (default distance threshold
-`0.6`). Every reference and scan in that manifest must use `split = "test"`;
+either `production_distance` (default distance threshold `0.6`) or
+`fixed_similarity` for each role. `fixed_similarity` requires an explicit finite
+cosine threshold in `[-1, 1]` and applies `score >= threshold`. An optional
+`threshold_source` is `provided_fixed` or `external_calibration`; the latter
+records a declaration rather than loading or verifying calibration evidence.
+Every reference and scan in that manifest must use `split = "test"`;
 calibration references/scans and `calibrate_f1` policies are rejected before
 adapter factories run. Do not duplicate identities or manufacture a calibration
 split. The manifest schema remains version 1.
@@ -120,7 +155,7 @@ candidate=DecisionPolicy("production_distance"))`. The default mode,
 `calibration_test`, continues to require identity-disjoint calibration and test
 scans, including when policies have fixed thresholds.
 
-Test-only evaluation applies the fixed strict distance boundary and uses labels
+Test-only evaluation applies the selected fixed distance or similarity boundary and uses labels
 only to compute metrics. Artifacts identify `evaluation_mode = "test_only"`
 and report no calibration source for fixed policies. These holdout results
 describe the reviewed corpus; they do not establish generalization to other
@@ -160,8 +195,13 @@ Use a new `output_dir` for every run so prior evidence is never overwritten.
 
 Provenance records dataset labels and SHA-256 hashes of reference/scan bytes,
 adapter identities, decision policies, Python/platform and selected installed
-package versions, Git commit, and dirty status when available. It does not hash
-model weights or capture the full uncommitted source diff. Retain exact code
+package versions, Git commit, and dirty status when available. Adapters may
+provide a public `describe()` method returning a finite JSON object; the runner
+validates and snapshots all descriptions before any inference. The optional
+YuNet/AuraFace adapter records model SHA-256 hashes, preprocessing version,
+configured providers and runtime package versions through this method. Existing
+adapters without it retain their identity/configuration provenance. The runner
+does not inspect private adapter fields or capture the full uncommitted source diff. Retain exact code
 and model environments separately for reproduction. Latencies are local
 observations affected by hardware, caching, and run conditions, not a portable
 performance benchmark. Keep artifacts private with the dataset.

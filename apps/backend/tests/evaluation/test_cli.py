@@ -78,7 +78,11 @@ def test_cli_production_policy_and_provenance(tmp_path):
     assert "commit" in provenance and "dlib" in provenance["packages"]
     assert provenance["dataset"]["references"][0]["sha256"] == sha256(b"a").hexdigest()
     assert provenance["dataset"]["scans"][1]["sha256"] == sha256(b"boundary").hexdigest()
-    assert provenance["decisions"]["baseline"] == {"policy": "production_distance", "threshold": 0.6}
+    assert provenance["decisions"]["baseline"] == {
+        "policy": "production_distance", "threshold": 0.6,
+        "threshold_source": "production_configuration", "comparator": ">",
+        "score_semantics": "negative_distance", "calibrated_on": None,
+    }
     assert provenance["adapters"]["baseline"]["identity"].endswith(":SyntheticAdapter")
     assert provenance["adapter_config"]["baseline"] == {
         "factory": "test_cli:SyntheticAdapter", "policy": "production_distance",

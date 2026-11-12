@@ -89,6 +89,24 @@ For a complete six-file placeholder manifest and manual ground-truth workflow,
 see [dataset preparation](../../../../docs/evaluation-dataset.md). The snippet
 below illustrates the schema; its paths are placeholders.
 
+## Dlib public calibration and score replay
+
+Follow the [Dlib calibration protocol](../../../../docs/dlib-calibration.md)
+and [frozen result](../../../../docs/dlib-calibration-result.md): verify the
+local public LFW data and image hashes, freeze the protocol before inference,
+then calibrate the unchanged production encoder. The selected distance
+`0.5567551387797269` is an experimental result, not a default configuration;
+production retains its existing model and strict `distance < 0.6` policy.
+
+The [threshold replay protocol](../../../../docs/dlib-threshold-replay.md) and
+[replay result](../../../../docs/dlib-threshold-replay-result.md) apply the
+approved calibration receipt to previously recorded scores. Replay does not
+rerun inference or measure new latency. The independent
+[public component profiling protocol](../../../../docs/component-profiling.md)
+and [profiling result](../../../../docs/component-profiling-result.md) diagnose
+encoder stages on a frozen public sample without selecting a threshold. These
+250×250 public timings do not explain private 1000px multi-face workloads.
+
 ## Local manifest
 
 The manifest is TOML version 1. All media must be local files below

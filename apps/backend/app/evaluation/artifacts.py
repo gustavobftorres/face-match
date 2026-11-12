@@ -64,7 +64,9 @@ def _write_bundle_files(
                 "policy": system.decision_policy.policy,
                 "comparator": system.decision_policy.comparator,
                 "score_semantics": system.decision_policy.score_semantics,
-                "distance_threshold": system.decision_policy.threshold,
+                "distance_threshold": (system.decision_policy.threshold
+                                       if system.decision_policy.policy == "production_distance" else None),
+                "threshold_source": system.decision_policy.source,
                 "calibrated_on": "calibration" if system.decision_policy.policy == "calibrate_f1" else None,
                 "frozen_on": "test",
             }
@@ -107,15 +109,15 @@ def _report(run: EvaluationRun) -> str:
     lines = [
         "# Face Search Evaluation",
         "",
-        f"Run `{run.run_id}`. F1 thresholds use calibration only; production distance thresholds are fixed. All thresholds are frozen for test.",
+        f"Run `{run.run_id}`. F1 thresholds use calibration only; distance and similarity policies use fixed thresholds. All thresholds are frozen for test.",
         "",
         "| System | Threshold | Precision | Recall | FPIR | FNIR | TPIR | p95 ms |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     if run.evaluation_mode == "test_only":
         lines[2] = (
-            f"Run `{run.run_id}`. Mode `test_only`: holdout evaluation with fixed production "
-            "distance thresholds; no calibration or threshold selection used these labels. "
+            f"Run `{run.run_id}`. Mode `test_only`: holdout evaluation with fixed "
+            "thresholds; this run performs no calibration or threshold selection on these labels. "
             "Results describe this corpus and do not establish generalization to other identities or datasets."
         )
     for role, system in run.systems.items():
@@ -132,7 +134,7 @@ def _report(run: EvaluationRun) -> str:
         lines.append(
             f"- {role}: `{policy.policy}`, score semantics `{policy.score_semantics}`, "
             f"comparator `{policy.comparator}`, score threshold `{system.threshold}`; "
-            f"distance threshold `{policy.threshold}`. Adapter `{system.adapter_identity}`."
+            f"threshold source `{policy.source}`. Adapter `{system.adapter_identity}`."
         )
     lines.extend(
         [

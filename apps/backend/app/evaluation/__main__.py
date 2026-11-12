@@ -60,8 +60,9 @@ def _adapter(value: Any, role: str):
 def _policy(value: Any, role: str) -> DecisionPolicy:
     if not isinstance(value, dict):
         raise ValueError(f"[{role}] table is required")
-    _known_fields(value, {"name", "factory", "options", "policy", "threshold"}, role)
-    return DecisionPolicy(value.get("policy", "calibrate_f1"), value.get("threshold"))
+    _known_fields(value, {"name", "factory", "options", "policy", "threshold", "threshold_source"}, role)
+    return DecisionPolicy(value.get("policy", "calibrate_f1"), value.get("threshold"),
+                          value.get("threshold_source"))
 
 
 def _known_fields(value: dict, allowed: set[str], label: str) -> None:

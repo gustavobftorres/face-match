@@ -67,6 +67,7 @@ def _evaluate(
         ]
         thresholds[role] = (
             -float(policy.threshold) if policy.policy == "production_distance"
+            else float(policy.threshold) if policy.policy == "fixed_similarity"
             else _calibrate_threshold(observations_by_role[role])
         )
     for role, adapter in adapters:

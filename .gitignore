@@ -14,6 +14,7 @@ node_modules/
 # General
 .DS_Store
 *.log
+MULTITENANT_PLAN.md
 
 # Private offline evaluation inputs and generated artifacts (at any depth).
 evaluation-media/

@@ -1,25 +1,36 @@
 # lib
 
-Central library for API calls, type definitions, utility functions, and i18n translations.
+Central frontend utilities, API clients, shared TypeScript contracts, and centralized Framer Motion choreography presets.
 
 ## Files
 
 ### `api.ts`
-API functions: `fetchAuthUrl`, `exchangeCode`, `startScan`. All endpoints read from `VITE_API_URL`.
+Centralized HTTP API client reading `VITE_API_URL`. Exposes `fetchPublicFolders`, `searchFacesPublic` (with automatic `resizeImageForUpload` downscaling for large selfies), `indexFolderAdmin`, `getDriveImageUrl` (supporting `thumb`, `preview`, and `full` variants), `fetchAuthUrl`, `exchangeCode`, and `fileToBase64`.
 
 ### `types.ts`
-Shared TypeScript interfaces: `AuthState` (with `expiresAt`), `WebSocketMessage` union, `ScanMatch`, etc.
+Shared domain contracts including `IndexedFolder`, `FaceSearchMatch`, `SearchResponse`, and `AuthState`.
 
-### `i18n.ts`
-Translation dictionaries for `en` and `pt-BR`. Exports `Locale`, `TranslationKey`, and `getTranslations(locale)`.
+### `animations.ts`
+Spring physics presets (`springs`), smooth cubic-bezier timings (`easings`), and reusable GPU-accelerated Framer Motion variants (`fadeInUp`, `scaleInPop`, `staggerContainer`, `staggerFastContainer`, `staggerItem`, `modalBackdrop`, `modalSheet`).
 
 ### `utils.ts`
-`cn()` helper for merging class names.
+Class name merging helper (`cn`) using `clsx` and `tailwind-merge`.
 
 ## Usage Example
 
-```ts
-import { getTranslations } from "@/lib/i18n";
-const t = getTranslations("pt-BR");
-console.log(t.signInWithGoogle); // "Entrar com Google"
+```tsx
+import { motion } from "framer-motion";
+import { staggerContainer, staggerItem, springs } from "@/lib/animations";
+
+export function ExampleGrid({ items }: { items: string[] }) {
+  return (
+    <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+      {items.map((item) => (
+        <motion.div key={item} variants={staggerItem} transition={springs.snappy}>
+          {item}
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+}
 ```

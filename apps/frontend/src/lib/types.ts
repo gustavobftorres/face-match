@@ -1,3 +1,28 @@
+export interface IndexedFolder {
+  id: string;
+  name: string;
+  drive_folder_id: string;
+  photo_count: number;
+  faces_count: number;
+  status: "indexing" | "ready" | "failed";
+  indexed_at: string;
+}
+
+export interface FaceSearchMatch {
+  file_id: string;
+  file_name: string;
+  confidence: number;
+  download_url?: string;
+  thumbnail_url?: string;
+}
+
+export interface SearchResponse {
+  folder_id: string;
+  total_photos: number;
+  matches: FaceSearchMatch[];
+  elapsed_ms: number;
+}
+
 export interface ScanProgress {
   type: "progress";
   scan_id: string;
@@ -57,7 +82,13 @@ export interface ScanCompleted {
   sequence: number;
 }
 
-export type WebSocketMessage = ScanStarted | ScanProgress | ScanMatch | ScanError | ScanTokenExpired | ScanCompleted;
+export type WebSocketMessage =
+  | ScanStarted
+  | ScanProgress
+  | ScanMatch
+  | ScanError
+  | ScanTokenExpired
+  | ScanCompleted;
 
 export type ScanStatusResponse =
   | { scan_id: string; status: "running"; remaining: number; last_sequence: number }

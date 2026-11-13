@@ -1,11 +1,11 @@
-# App Directory
+# App Routes & Styles
 
-This directory contains the Next.js App Router pages and layouts.
+## Purpose
+Contains the application routes, route-owned feature components, and global vibrant light-mode stylesheet.
 
-## Files
-- \`layout.tsx\`: Root layout definition.
-- \`page.tsx\`: Home page.
-- \`globals.css\`: Global styles and Tailwind directives.
-
-## Subdirectories
-- \`api/\`: Route handlers (if needed).
+## Files & Subdirectories
+- `page.tsx`: Public zero-login face discovery route (`/`) with `HeroBanner`, `FolderPicker`, `SelfieUploader`, and `SearchResultsGrid`.
+- `globals.css`: Tailwind v4 theme variables, light ambient radial gradient washes, and font definitions.
+- `components/`: Route-owned components for the `/` public search route.
+- `admin/`: Administrator Drive indexing route (`/admin`) and its route-owned components.
+- `auth/callback/`: OAuth callback route (`/auth/callback`) handing Drive code exchanges and redirecting to `/admin`.

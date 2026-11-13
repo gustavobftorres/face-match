@@ -6,11 +6,14 @@ import logging
 import math
 import uuid
 from io import BytesIO
+from typing import Optional
 from celery import Task
 from celery.exceptions import SoftTimeLimitExceeded, Retry
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.services.ai_service import get_face_encodings, compare_faces
+from app.services.embedding_store import embedding_store
+from app.services.image_cache_service import image_cache_service
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +24,6 @@ MAX_RETRIES = 3
 MAX_COORDINATION_RETRIES = 3
 SCAN_STATUS_TTL = 3600
 CLAIM_TTL = 480
-
 
 SCAN_EVENT_LUA = """
 local sequence = redis.call('INCR', KEYS[1])
@@ -172,7 +174,6 @@ redis.call('EXPIRE', KEYS[3], ttl)
 return 'failed'
 """
 
-
 def scan_event_keys(scan_id: str):
     return (
         f"scan_sequence:{scan_id}",
@@ -182,7 +183,6 @@ def scan_event_keys(scan_id: str):
         f"scan_status:{scan_id}",
         f"scan_processed:{scan_id}",
     )
-
 
 def finalize_file(scan_id: str, file_id: str, payload: dict | None):
     keys = (
@@ -203,7 +203,6 @@ def finalize_file(scan_id: str, file_id: str, payload: dict | None):
         SCAN_STATUS_TTL,
         scan_id,
     )
-
 
 def expire_token_and_finalize(scan_id: str, file_id: str):
     keys = (
@@ -228,7 +227,6 @@ def expire_token_and_finalize(scan_id: str, file_id: str):
         SCAN_STATUS_TTL,
     )
 
-
 def fail_scan(scan_id: str, error: str):
     keys = (
         f"scan_status:{scan_id}",
@@ -250,17 +248,80 @@ def fail_scan(scan_id: str, error: str):
         SCAN_STATUS_TTL,
     )
 
-
-def download_file(file_id: str, access_token: str) -> bytes:
-    headers = {"Authorization": f"Bearer {access_token}"}
-    download_url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
+def download_file(file_id: str, access_token: Optional[str] = None) -> bytes:
+    if access_token:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        download_url = settings.DRIVE_API_FILE_MEDIA_URL.format(file_id=file_id)
+    else:
+        headers = {}
+        download_url = settings.DRIVE_PUBLIC_DOWNLOAD_URL.format(file_id=file_id)
     buffer = BytesIO()
     with httpx.stream("GET", download_url, headers=headers, follow_redirects=True, timeout=DOWNLOAD_TIMEOUT) as response:
         response.raise_for_status()
+        content_type = response.headers.get("content-type", "").lower()
+        if content_type.startswith("text/html"):
+            raise ValueError(f"Unexpected HTML response when downloading Drive file {file_id}")
         for chunk in response.iter_bytes():
             buffer.write(chunk)
     return buffer.getvalue()
 
+
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+FOLDER_INDEX_TTL = 86400
+
+
+def _finalize_folder_file(folder_id: str, file_id: str) -> None:
+    processed_key = f"folder_processed:{folder_id}"
+    counter_key = f"folder_remaining:{folder_id}"
+    added = redis_text_client.sadd(processed_key, file_id)
+    redis_text_client.expire(processed_key, FOLDER_INDEX_TTL)
+    if added == 1:
+        remaining = redis_text_client.decr(counter_key)
+        if remaining <= 0:
+            embedding_store.update_folder_status(folder_id, "ready")
+            logger.info(f"Folder indexing complete for folder {folder_id}")
+
+
+@celery_app.task(bind=True, max_retries=3)
+def index_drive_file(
+    self: Task,
+    folder_id: str,
+    file_id: str,
+    file_name: str,
+    access_token: Optional[str] = None,
+    download_url: Optional[str] = None,
+    thumbnail_url: Optional[str] = None,
+):
+    try:
+        image_content = download_file(file_id, access_token)
+        image_cache_service.cache_thumbnail_from_bytes(file_id, image_content, variant="thumb")
+        encodings = get_face_encodings(image_content)
+        embedding_store.save_face_encodings(
+            folder_id=folder_id,
+            file_id=file_id,
+            file_name=file_name,
+            encodings=encodings,
+            download_url=download_url,
+            thumbnail_url=thumbnail_url,
+        )
+        _finalize_folder_file(folder_id, file_id)
+    except httpx.HTTPStatusError as exc:
+        status_code = exc.response.status_code
+        if status_code in RETRYABLE_STATUS_CODES and self.request.retries < self.max_retries:
+            countdown = 15 * (2 ** self.request.retries) if status_code == 429 else 2 ** self.request.retries
+            raise self.retry(exc=exc, countdown=countdown)
+        logger.error(f"HTTP {status_code} indexing file {file_id} in {folder_id}: {exc}")
+        _finalize_folder_file(folder_id, file_id)
+    except httpx.TransportError as exc:
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc, countdown=2 ** self.request.retries)
+        logger.error(f"Transport error indexing file {file_id} in {folder_id}: {exc}")
+        _finalize_folder_file(folder_id, file_id)
+    except Retry:
+        raise
+    except Exception as exc:
+        logger.error(f"Error indexing file {file_id} in {folder_id}: {exc}")
+        _finalize_folder_file(folder_id, file_id)
 
 @celery_app.task(bind=True, max_retries=None)
 def process_image(
@@ -407,7 +468,7 @@ def process_image(
             "file_id": file_id,
             "file_name": file_name,
             "status": result_status,
-            "download_url": f"https://drive.google.com/uc?id={file_id}&export=download" if match_found else None,
+            "download_url": settings.DRIVE_PUBLIC_UC_DOWNLOAD_URL.format(file_id=file_id) if match_found else None,
         })
 
     except Retry:

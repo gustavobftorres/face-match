@@ -9,11 +9,9 @@ logger = logging.getLogger(__name__)
 MAX_IMAGE_DIMENSION = 1000
 FACE_MATCH_DISTANCE_THRESHOLD = 0.6
 
-
 def get_face_encodings(image_content: bytes):
     try:
         image = Image.open(BytesIO(image_content))
-
         image = ImageOps.exif_transpose(image)
 
         if image.mode != "RGB":
@@ -24,8 +22,6 @@ def get_face_encodings(image_content: bytes):
             image.thumbnail((MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION), Image.LANCZOS)
 
         image_np = np.array(image)
-
-        # Use num_jitters=1 (default) and standard model, the resizing is the main speedup
         return face_recognition.face_encodings(image_np)
 
     except UnidentifiedImageError:
@@ -34,7 +30,6 @@ def get_face_encodings(image_content: bytes):
     except Exception as e:
         logger.error(f"Error in face encoding: {str(e)}")
         return []
-
 
 def compare_faces(known_encoding: np.ndarray, unknown_encoding: np.ndarray) -> bool:
     try:

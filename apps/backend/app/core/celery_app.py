@@ -19,12 +19,10 @@ def ensure_ssl_cert_reqs(url: str) -> str:
 
 redis_url = ensure_ssl_cert_reqs(settings.REDIS_URL)
 
-# Also ensure any Celery native environment variables are fixed if the user set those instead
 if "CELERY_BROKER_URL" in os.environ:
     os.environ["CELERY_BROKER_URL"] = ensure_ssl_cert_reqs(os.environ["CELERY_BROKER_URL"])
 if "CELERY_RESULT_BACKEND" in os.environ:
     os.environ["CELERY_RESULT_BACKEND"] = ensure_ssl_cert_reqs(os.environ["CELERY_RESULT_BACKEND"])
-# Some HF Spaces configs might use REDIS_URL from os.environ
 if "REDIS_URL" in os.environ:
     os.environ["REDIS_URL"] = ensure_ssl_cert_reqs(os.environ["REDIS_URL"])
 

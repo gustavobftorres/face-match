@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 BACKEND_DIR := apps/backend
 FRONTEND_DIR := apps/frontend
 VENV := $(BACKEND_DIR)/venv

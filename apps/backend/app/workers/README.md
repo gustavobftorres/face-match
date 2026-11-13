@@ -4,9 +4,7 @@ Celery task definitions for asynchronous image processing.
 
 ## Architecture
 
-- `tasks.py` — The `process_image` Celery task. Downloads an image from Google
-  Drive, extracts face encodings, compares against the target face, and records
-  and publishes scan-scoped events through Redis.
+- `tasks.py` — Defines `index_drive_file` (persisting embeddings into `EmbeddingStore`, saving local `480px` JPEG thumbnails via `image_cache_service`, and tracking deduplicated Redis progress) and `process_image` (real-time scan task publishing scan-scoped events through Redis).
 
 ## Data Flow
 

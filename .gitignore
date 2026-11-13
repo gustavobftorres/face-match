@@ -1,22 +1,20 @@
-# Python
 __pycache__/
 *.py[cod]
 *.pyo
 venv/
 .env
 .env.local
-
-# Node
 node_modules/
 .next/
-.env.local
-
-# General
-.DS_Store
+dist/
 *.log
+.DS_Store
 MULTITENANT_PLAN.md
-
-# Private offline evaluation inputs and generated artifacts (at any depth).
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+.cache/
 evaluation-media/
 evaluation-runs/
 evaluation.toml
@@ -25,3 +23,4 @@ evaluation-*.local.toml
 evaluation-manifest.toml
 evaluation-manifest-*.toml
 !evaluation-manifest.example.toml
+.neon

@@ -23,7 +23,7 @@ def test_tenant_isolation_and_global_identity():
     a, b, user, event_a, event_b = (uuid4() for _ in range(5))
     with psycopg.connect(ADMIN) as admin:
         admin.execute(sql.SQL('GRANT USAGE ON SCHEMA public TO {}').format(sql.Identifier(role)))
-        admin.execute(sql.SQL('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {}').format(sql.Identifier(role)))
+        admin.execute(sql.SQL('GRANT SELECT, INSERT, UPDATE, DELETE ON public.users, public.tenants, public.tenant_domains, public.tenant_branding, public.tenant_memberships, public.events, public.event_participations TO {}').format(sql.Identifier(role)))
         admin.execute('INSERT INTO users (id, google_subject) VALUES (%s, %s)', (user, str(user)))
         admin.execute("INSERT INTO tenants (id, name, slug) VALUES (%s, 'A', %s), (%s, 'B', %s)", (a, str(a), b, str(b)))
     with tenant_session(RUNTIME, a) as conn:

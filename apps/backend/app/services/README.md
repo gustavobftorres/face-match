@@ -34,3 +34,6 @@ Disk-backed async thumbnail cache and connection-pooled Drive image fetcher:
 - `get_or_fetch_variant`: Serves `thumb` (`480px`) or `preview` (`1080px`) JPEG variants from disk (`THUMBNAIL_CACHE_DIR`) or fetches/resizes atomically on cache miss with per-file in-flight locks.
 - `cache_thumbnail_from_bytes`: Generates and persists local `thumb` JPEG files directly during Celery folder indexing.
 - `prewarm_variants`: Concurrently warms cached thumbnails for matched search results in background tasks.
+
+### `branding.py`
+-  predefined tenant palettes (contrast checked in tests) and `process_logo`, which size-limits, decodes and re-encodes raster logos (no SVG).

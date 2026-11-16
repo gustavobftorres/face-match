@@ -34,3 +34,6 @@ export function ExampleGrid({ items }: { items: string[] }) {
   );
 }
 ```
+
+### `tenant-api.ts`
+Same-origin tenant client (session, events, gallery) plus organizer admin calls (`listAdminEvents`, `createAdminEvent`, `updateAdminEvent`, `setAdminEventStatus`, `getAdminBranding`, `updateAdminBranding`, `uploadAdminLogo`, `deleteAdminLogo`); mutations send the CSRF header and never a tenant id.

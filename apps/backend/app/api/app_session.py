@@ -98,6 +98,9 @@ def login(body: LoginBody, request: Request, response: Response, tid: UUID = Dep
             VALUES (%s, %s, %s, %s) ON CONFLICT (google_subject) DO UPDATE
             SET email = EXCLUDED.email, display_name = EXCLUDED.display_name RETURNING id''',
             (uuid4(), claims['sub'], claims.get('email') if claims.get('email_verified') is True else None, claims.get('name'))).fetchone()[0]
+        # Turns a pending, unexpired invitation for this tenant into a membership only
+        # when the stored (Google-verified) email matches; no-op otherwise.
+        conn.execute('SELECT public.claim_tenant_invitations(%s, %s)', (tid, user))
         conn.execute("INSERT INTO app_sessions (token_hash, tenant_id, hostname, user_id, csrf_hash, expires_at) VALUES (%s, %s, %s, %s, %s, now() + interval '8 hours')", (digest(token), tid, host, user, digest(csrf)))
     set_cookie(response, SESSION, token, 28800)
     set_cookie(response, CSRF, csrf, 28800, httponly=False)

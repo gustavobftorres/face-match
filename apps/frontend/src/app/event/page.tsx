@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { ApiError, createChallenge, getEvent, getSession, getTenant, loginWithGoogle, logout, type EventInfo, type Tenant } from "@/lib/tenant-api";
 import "./participant.css";
 import { OrganizerGallery, ParticipantGallery } from "./gallery";
+import { OrganizerPanel } from "./manage-panel";
 
 type GoogleIdentity = {
   initialize: (config: { client_id: string; nonce: string; ux_mode: "popup"; callback: (response: { credential: string }) => void }) => void;
@@ -27,7 +28,7 @@ function loadGoogle(): Promise<void> {
   return googleScript;
 }
 
-export default function ParticipantEventPage({ manage = false }: { manage?: boolean }) {
+export default function ParticipantEventPage({ manage = false, panel = false }: { manage?: boolean; panel?: boolean }) {
   const { eventId = "" } = useParams();
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [phase, setPhase] = useState<"loading" | "login" | "ready" | "notfound" | "error">("loading");
@@ -46,6 +47,7 @@ export default function ParticipantEventPage({ manage = false }: { manage?: bool
         throw error;
       }
       setSignedIn(true);
+      if (panel) { setPhase("ready"); return; }
       try { setEvent(await getEvent(eventId)); setPhase("ready"); } catch (error) {
         if (error instanceof ApiError && error.status === 401) { setSignedIn(false); setPhase("login"); return; }
         if (error instanceof ApiError && (error.status === 404 || error.status === 422)) { setPhase("notfound"); return; }
@@ -55,7 +57,7 @@ export default function ParticipantEventPage({ manage = false }: { manage?: bool
       if (error instanceof ApiError && error.status === 404) setPhase("notfound");
       else setPhase("error");
     }
-  }, [eventId]);
+  }, [eventId, panel]);
   useEffect(() => { void refresh(); }, [refresh]);
 
   const prepareLogin = async () => {
@@ -90,11 +92,12 @@ export default function ParticipantEventPage({ manage = false }: { manage?: bool
       <div className="participant-brand">{tenant?.branding.logo_url && <img src={tenant.branding.logo_url} alt="" />}<span>{tenant?.name || "Face Match"}</span></div>
       {signedIn && <button className="participant-link" disabled={busy} onClick={() => void signOut()}>Sair</button>}
     </header>
-    <section className="participant-card" aria-live="polite">
-      <p className="participant-eyebrow">SEU EVENTO · SUAS MEMÓRIAS</p>
-      {phase === "loading" && <><h1>Preparando seu evento</h1><p>Aguarde um instante.</p></>}
-      {phase === "login" && <><h1>Boas-vindas ao seu evento</h1><p>Entre com sua conta Google para acessar os detalhes do evento.</p><button className="participant-action" disabled={busy} onClick={() => void prepareLogin()}>{busy ? "Preparando…" : "Preparar login com Google"}</button><div className="google-button" ref={buttonRef} /></>}
-      {phase === "ready" && event && <><h1>{event.name}</h1>{manage ? <OrganizerGallery key={eventId} eventId={eventId} onExpired={onExpired} /> : <ParticipantGallery key={eventId} eventId={eventId} onExpired={onExpired} />}</>}
+    <section className={`participant-card${panel ? " participant-wide" : ""}`} aria-live="polite">
+      <p className="participant-eyebrow">{panel ? "ORGANIZAÇÃO" : "SEU EVENTO · SUAS MEMÓRIAS"}</p>
+      {phase === "loading" && <><h1>{panel ? "Preparando o painel" : "Preparando seu evento"}</h1><p>Aguarde um instante.</p></>}
+      {phase === "login" && <><h1>{panel ? "Painel do organizador" : "Boas-vindas ao seu evento"}</h1><p>{panel ? "Entre com a conta Google de organizador para gerenciar eventos e a identidade visual." : "Entre com sua conta Google para acessar os detalhes do evento."}</p><button className="participant-action" disabled={busy} onClick={() => void prepareLogin()}>{busy ? "Preparando…" : "Preparar login com Google"}</button><div className="google-button" ref={buttonRef} /></>}
+      {phase === "ready" && panel && <><h1>Painel do organizador</h1><OrganizerPanel onExpired={onExpired} onBrandingChange={() => void getTenant().then(setTenant).catch(() => undefined)} /></>}
+      {phase === "ready" && !panel && event && <><h1>{event.name}</h1>{manage ? <OrganizerGallery key={eventId} eventId={eventId} onExpired={onExpired} /> : <ParticipantGallery key={eventId} eventId={eventId} onExpired={onExpired} />}</>}
       {phase === "notfound" && <><h1>Evento indisponível</h1><p>Não encontramos este evento ou sua conta não tem acesso a ele.</p><button className="participant-link" onClick={() => void refresh()}>Tentar novamente</button></>}
       {phase === "error" && <><h1>Não foi possível carregar</h1><p>Verifique sua conexão e tente novamente.</p><button className="participant-action" onClick={() => void refresh()}>Tentar novamente</button></>}
       {message && <p className="participant-message" role="status">{message}</p>}

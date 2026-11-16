@@ -26,3 +26,11 @@ This module handles HTTP requests and WebSocket connections.
 - **GET /api/v1/drive/image/{file_id}** → image byte stream
 - **POST /api/v1/scan** → `{ "message": "Scan started", "total_files": N }`
 - **WebSocket /api/v1/ws/updates/{scan_id}** → real-time events
+
+## Organizer administration (`tenant_admin.py`)
+
+Tenant admin routes under `/api/v1/admin` require a session cookie of an owner/admin of the host's tenant; mutations also require Origin and `X-CSRF-Token`. They are separate from the legacy `/admin` frontend page and the Drive endpoints above.
+- `GET /admin/access` -> `{role}`; `GET/POST /admin/events`, `GET/PATCH /admin/events/{id}`, `POST /admin/events/{id}/publish|unpublish|close`.
+- `GET/PUT /admin/branding` (`{palette}` from predefined palettes), `PUT/DELETE /admin/branding/logo` (multipart `logo`; PNG/JPEG/WebP up to 1 MiB, decoded and re-encoded to a bounded PNG).
+- `GET /tenant/logo/{token}.png` (public, tenant by hostname only): `image/png`, `nosniff`; the token is opaque tenant+version, only the current one is served (immutable, ETag/304), else 404 `no-store`. `GET /tenant/context` also returns `branding.palette`.
+- There is no HTTP route to create tenants; use `python -m app.db.provision_tenant` (see `app/db/README.md`).

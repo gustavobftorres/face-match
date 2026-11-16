@@ -10,3 +10,5 @@ Automated test suite verifying facial recognition logic, Celery scan isolation, 
 - `test_postgres_embedding_store.py`: Unit and optional live integration tests for Neon Postgres (`pgvector` / `lakebase_vector`) embedding storage and backend selection.
 - `test_public_drive_indexing.py`: End-to-end mocked tests for public Google Drive folder parsing, indexing, image streaming, and face search.
 - `test_image_cache.py`: Unit tests for cached thumbnail/preview generation and download headers.
+- `db/test_tenant_admin.py`: PostgreSQL tests for organizer admin API isolation between two tenants, roles, CSRF, RLS at the database layer, invitations and the provisioning CLI.
+- `test_branding.py`: palette contrast and logo processing unit tests.

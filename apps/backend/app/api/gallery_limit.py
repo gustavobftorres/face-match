@@ -8,11 +8,13 @@ class GalleryUploadLimit:
     def __init__(self, app):
         self.app = app
         self.path = re.compile(re.escape(settings.API_V1_STR.rstrip('/')) + r'/events/[^/]+/gallery/search/?')
+        self.method = 'POST'
+        self.limit = 5 * 1024 * 1024 + 65536
 
     async def __call__(self, scope, receive, send):
-        if scope['type'] != 'http' or scope['method'] != 'POST' or not self.path.fullmatch(scope['path']):
+        if scope['type'] != 'http' or scope['method'] != self.method or not self.path.fullmatch(scope['path']):
             return await self.app(scope, receive, send)
-        limit = 5 * 1024 * 1024 + 65536
+        limit = self.limit
         chunks = []
         size = 0
         while True:
@@ -35,3 +37,12 @@ class GalleryUploadLimit:
             delivered = True
             return {'type': 'http.request', 'body': body, 'more_body': False}
         await self.app(scope, replay, send)
+
+
+class LogoUploadLimit(GalleryUploadLimit):
+    """Same pre-parser cap for the organizer logo upload (1 MiB plus multipart overhead)."""
+    def __init__(self, app):
+        super().__init__(app)
+        self.path = re.compile(re.escape(settings.API_V1_STR.rstrip('/')) + r'/admin/branding/logo/?')
+        self.method = 'PUT'
+        self.limit = 1024 * 1024 + 65536

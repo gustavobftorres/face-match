@@ -9,3 +9,4 @@ Contains the application routes, route-owned feature components, and global vibr
 - `components/`: Route-owned components for the `/` public search route.
 - `admin/`: Administrator Drive indexing route (`/admin`) and its route-owned components.
 - `auth/callback/`: OAuth callback route (`/auth/callback`) handing Drive code exchanges and redirecting to `/admin`.
+- `event/`: tenant participant/organizer routes (`/events/:id`, `/events/:id/manage`) and the organizer panel (`/manage`: events, publishing, palette, logo; backend enforces access).

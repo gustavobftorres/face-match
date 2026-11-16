@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ApiError, createChallenge, getEvent, getSession, getTenant, loginWithGoogle, logout, type EventInfo, type Tenant } from "@/lib/tenant-api";
 import "./participant.css";
+import { OrganizerGallery, ParticipantGallery } from "./gallery";
 
 type GoogleIdentity = {
   initialize: (config: { client_id: string; nonce: string; ux_mode: "popup"; callback: (response: { credential: string }) => void }) => void;
@@ -26,7 +27,7 @@ function loadGoogle(): Promise<void> {
   return googleScript;
 }
 
-export default function ParticipantEventPage() {
+export default function ParticipantEventPage({ manage = false }: { manage?: boolean }) {
   const { eventId = "" } = useParams();
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [phase, setPhase] = useState<"loading" | "login" | "ready" | "notfound" | "error">("loading");
@@ -81,6 +82,7 @@ export default function ParticipantEventPage() {
     catch (error) { if (error instanceof ApiError && error.status === 401) { setEvent(null); setSignedIn(false); setPhase("login"); } else setMessage("Não foi possível sair. Tente novamente."); }
     finally { setBusy(false); }
   };
+  const onExpired = useCallback(() => { setSignedIn(false); setEvent(null); setPhase("login"); setMessage("Sua sessão expirou. Entre novamente."); }, []);
   const primary = tenant?.branding.colors.primary;
   const accent = primary && /^#[0-9a-fA-F]{6}$/.test(primary) ? primary : "#5934c9";
   return <main className="participant-page" style={{ "--tenant-accent": accent } as React.CSSProperties}>
@@ -92,7 +94,7 @@ export default function ParticipantEventPage() {
       <p className="participant-eyebrow">SEU EVENTO · SUAS MEMÓRIAS</p>
       {phase === "loading" && <><h1>Preparando seu evento</h1><p>Aguarde um instante.</p></>}
       {phase === "login" && <><h1>Boas-vindas ao seu evento</h1><p>Entre com sua conta Google para acessar os detalhes do evento.</p><button className="participant-action" disabled={busy} onClick={() => void prepareLogin()}>{busy ? "Preparando…" : "Preparar login com Google"}</button><div className="google-button" ref={buttonRef} /></>}
-      {phase === "ready" && event && <><h1>{event.name}</h1><p>Você tem acesso a este evento.</p><div className="participant-notice">A busca de fotos para participantes estará disponível em breve.</div></>}
+      {phase === "ready" && event && <><h1>{event.name}</h1>{manage ? <OrganizerGallery key={eventId} eventId={eventId} onExpired={onExpired} /> : <ParticipantGallery key={eventId} eventId={eventId} onExpired={onExpired} />}</>}
       {phase === "notfound" && <><h1>Evento indisponível</h1><p>Não encontramos este evento ou sua conta não tem acesso a ele.</p><button className="participant-link" onClick={() => void refresh()}>Tentar novamente</button></>}
       {phase === "error" && <><h1>Não foi possível carregar</h1><p>Verifique sua conexão e tente novamente.</p><button className="participant-action" onClick={() => void refresh()}>Tentar novamente</button></>}
       {message && <p className="participant-message" role="status">{message}</p>}

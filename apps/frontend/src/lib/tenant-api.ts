@@ -18,3 +18,19 @@ export function logout() {
   if (!cookie) throw new Error("CSRF cookie missing");
   return request<void>("/session", { method: "DELETE", headers: { "X-CSRF-Token": decodeURIComponent(cookie.slice(cookie.indexOf("=") + 1)) } });
 }
+
+export type GalleryJob = { id: string; status: "queued" | "processing" | "ready" | "failed" };
+export type GallerySearch = { id: string; photos: string[] };
+function csrfHeaders(): Record<string, string> {
+  const cookie = document.cookie.split("; ").find(value => value.startsWith("__Host-fm_csrf="));
+  if (!cookie) throw new Error("CSRF cookie missing");
+  return { "X-CSRF-Token": decodeURIComponent(cookie.slice(cookie.indexOf("=") + 1)) };
+}
+const galleryPath = (id: string) => `/events/${encodeURIComponent(id)}/gallery`;
+export const latestGalleryJob = (id: string) => request<{ job: GalleryJob | null }>(`${galleryPath(id)}/jobs/latest`);
+export const startGalleryIndex = (id: string, folder: string) => request<GalleryJob>(`${galleryPath(id)}/index`, { method: "POST", headers: { ...csrfHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ folder }) });
+export function searchGallery(id: string, selfie: File) {
+  const data = new FormData(); data.append("selfie", selfie);
+  return request<GallerySearch>(`${galleryPath(id)}/search`, { method: "POST", headers: csrfHeaders(), body: data });
+}
+export const galleryPhotoUrl = (eventId: string, searchId: string, photoId: string) => `/api/v1${galleryPath(eventId)}/searches/${encodeURIComponent(searchId)}/photos/${encodeURIComponent(photoId)}`;

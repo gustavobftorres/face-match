@@ -60,6 +60,16 @@ def start_index(event_id: UUID, body: IndexRequest, request: Request, auth=Depen
     return {'id': str(job), 'status': 'queued'}
 
 
+@router.get('/events/{event_id}/gallery/jobs/latest')
+def latest_job(event_id: UUID, response: Response, auth=Depends(authenticated)):
+    with tenant_session(settings.DATABASE_URL, auth[0]) as conn:
+        if not allowed(conn, event_id, auth[1], True):
+            raise HTTPException(404, 'Not found')
+        row = conn.execute('SELECT id, status FROM gallery_jobs WHERE event_id = %s ORDER BY created_at DESC, id DESC LIMIT 1', (event_id,)).fetchone()
+    response.headers['Cache-Control'] = 'private, no-store'
+    return {'job': {'id': str(row[0]), 'status': row[1]} if row else None}
+
+
 @router.get('/events/{event_id}/gallery/jobs/{job_id}')
 def job_status(event_id: UUID, job_id: UUID, response: Response, auth=Depends(authenticated)):
     with tenant_session(settings.DATABASE_URL, auth[0]) as conn:

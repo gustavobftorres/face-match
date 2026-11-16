@@ -17,7 +17,10 @@ def provision(database_url: str, runtime_role: str) -> None:
         identifier = sql.Identifier(runtime_role)
         for statement in (
             'GRANT USAGE ON SCHEMA public TO {}',
-            'GRANT SELECT ON public.tenants, public.tenant_branding TO {}',
+            'GRANT SELECT ON public.tenants, public.tenant_branding, public.events, public.tenant_memberships, public.event_participations TO {}',
+            'GRANT SELECT, INSERT, UPDATE ON public.users TO {}',
+            'GRANT SELECT, INSERT, DELETE ON public.login_challenges TO {}',
+            'GRANT SELECT, INSERT, UPDATE ON public.app_sessions TO {}',
             'GRANT EXECUTE ON FUNCTION public.lookup_tenant_hostname(text) TO {}',
             'REVOKE ALL ON public.tenant_hostname_lookup FROM {}',
         ):

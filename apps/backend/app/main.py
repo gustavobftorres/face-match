@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.api.endpoints import router as api_router
 from app.api.auth import router as auth_router
 from app.api.tenant_context import router as tenant_context_router
+from app.api.app_session import router as app_session_router
 from app.services.image_cache_service import image_cache_service
 
 logging.basicConfig(
@@ -39,3 +40,5 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth")
 
 app.include_router(tenant_context_router, prefix=settings.API_V1_STR)
+
+app.include_router(app_session_router, prefix=settings.API_V1_STR)

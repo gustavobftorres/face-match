@@ -86,7 +86,7 @@ This application processes photos purely for match confirmation and integrates d
 
 ### Jornada de participante
 
-A rota `/eventos/<uuid-do-evento>` consulta `/api/v1/tenant/context`, verifica `/session` e busca o evento autorizado no mesmo domínio. Ela usa o botão oficial Google Identity Services em popup, com nonce de curta duração obtido do backend; o ID token é enviado à sessão da aplicação, sem compartilhar tokens do fluxo legado do Drive. A busca de fotos para participantes ainda não está integrada. Veja a [referência do Google Identity Services](https://developers.google.com/identity/gsi/web/reference/js-reference).
+A rota `/events/<uuid-do-evento>` consulta `/api/v1/tenant/context`, verifica `/session` e busca o evento autorizado no mesmo domínio. Ela usa o botão oficial Google Identity Services em popup, com nonce de curta duração obtido do backend; o ID token é enviado à sessão da aplicação, sem compartilhar tokens do fluxo legado do Drive. A busca de fotos para participantes ainda não está integrada. Veja a [referência do Google Identity Services](https://developers.google.com/identity/gsi/web/reference/js-reference).
 
 Configure `VITE_GOOGLE_CLIENT_ID` no frontend com o mesmo client ID configurado em `GOOGLE_CLIENT_ID` no backend. Cadastre cada origem HTTPS de tenant usada para login como origem JavaScript autorizada no projeto Google. O proxy de produção deve encaminhar `/api` ao backend preservando o Host original; ele deve aceitar apenas hosts e origens esperados. Cookies de sessão exigem HTTPS e não são compartilhados entre subdomínios.
 
@@ -100,6 +100,6 @@ VITE_GOOGLE_CLIENT_ID=seu-client-id \
 npm run dev
 ```
 
-Abra `https://tenant.example.test:3000/eventos/<uuid>`. O proxy Vite encaminha `/api` para `http://127.0.0.1:8000` preservando Host e Origin; não é necessário `VITE_API_URL` para essas rotas. O modo HTTP normal continua disponível para os fluxos legados, mas o login de participante exige HTTPS. O exemplo de hostname deve ser substituído pelo hostname configurado e autorizado no Google.
+Abra `https://tenant.example.test:3000/events/<uuid>`. O proxy Vite encaminha `/api` para `http://127.0.0.1:8000` preservando Host e Origin; não é necessário `VITE_API_URL` para essas rotas. O modo HTTP normal continua disponível para os fluxos legados, mas o login de participante exige HTTPS. O exemplo de hostname deve ser substituído pelo hostname configurado e autorizado no Google.
 
 Os testes de contrato do cliente podem ser executados com `npm test`.

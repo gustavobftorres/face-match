@@ -13,7 +13,7 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/eventos/:eventId" element={<ParticipantEventPage />} />
+        <Route path="/events/:eventId" element={<ParticipantEventPage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
       </Routes>

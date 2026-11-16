@@ -48,11 +48,14 @@ def test_gallery_isolation_and_worker_validation(monkeypatch):
     path = f'/events/{event_a}/gallery'
     state['auth'] = (a, person, digest('csrf'), 'session')
     assert c.post(path + '/index', json={'folder': 'abcdefghijk'}).status_code == 404
+    assert c.get(path + '/jobs/latest').status_code == 404
     state['auth'] = (a, admin, digest('csrf'), 'session')
     assert c.post(path + '/index', headers={'x-csrf-token': 'bad'}, json={'folder':'abcdefghijk'}).status_code == 403
+    assert c.get(path + '/jobs/latest').json() == {'job': None}
     response = c.post(path + '/index', json={'folder':'abcdefghijk'})
     assert response.status_code == 202
     job = response.json()['id']
+    assert c.get(path + '/jobs/latest').json() == {'job': {'id': job, 'status': 'queued'}}
     assert c.post(path + '/index', json={'folder':'abcdefghijk'}).status_code == 409
     worker.index_event(str(b), str(event_b), job)
     assert c.get(path + f'/jobs/{job}').json()['status'] == 'queued'

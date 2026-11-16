@@ -14,6 +14,7 @@ createRoot(document.getElementById("root")!).render(
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/events/:eventId" element={<ParticipantEventPage />} />
+        <Route path="/events/:eventId/manage" element={<ParticipantEventPage manage />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
       </Routes>

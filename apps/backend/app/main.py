@@ -7,6 +7,8 @@ from app.api.endpoints import router as api_router
 from app.api.auth import router as auth_router
 from app.api.tenant_context import router as tenant_context_router
 from app.api.app_session import router as app_session_router
+from app.api.event_gallery import router as event_gallery_router
+from app.api.gallery_limit import GalleryUploadLimit
 from app.services.image_cache_service import image_cache_service
 
 logging.basicConfig(
@@ -28,6 +30,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(GalleryUploadLimit)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -42,3 +46,5 @@ app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth")
 app.include_router(tenant_context_router, prefix=settings.API_V1_STR)
 
 app.include_router(app_session_router, prefix=settings.API_V1_STR)
+
+app.include_router(event_gallery_router, prefix=settings.API_V1_STR)

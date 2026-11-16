@@ -2,7 +2,11 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-REPO_ROOT = Path(__file__).resolve().parents[4]
+# Monorepo checkout: <repo>/apps/backend. Containers copy backend to /app;
+# in that layout the backend itself is the only project root.
+REPO_ROOT = (BACKEND_ROOT.parent.parent
+             if BACKEND_ROOT.name == 'backend' and BACKEND_ROOT.parent.name == 'apps'
+             else BACKEND_ROOT)
 
 class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
@@ -14,6 +18,7 @@ class Settings(BaseSettings):
     GOOGLE_REDIRECT_URI: str = "http://localhost:3000/auth/callback"
     DATABASE_URL: str = ""
     DATABASE_URL_UNPOOLED: str = ""
+    GALLERY_DISPATCHER_DATABASE_URL: str = ""
     FACE_MATCH_DB_PATH: str = str(BACKEND_ROOT / "face_match_embeddings.db")
     THUMBNAIL_CACHE_DIR: str = str(BACKEND_ROOT / ".cache" / "thumbnails")
     PREWARM_THUMBNAILS_ON_SEARCH: bool = True
@@ -40,7 +45,7 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
-for _env_attr in ("REDIS_URL", "DATABASE_URL", "DATABASE_URL_UNPOOLED"):
+for _env_attr in ("REDIS_URL", "DATABASE_URL", "DATABASE_URL_UNPOOLED", "GALLERY_DISPATCHER_DATABASE_URL"):
     _env_val = getattr(settings, _env_attr, "")
     if isinstance(_env_val, str):
         setattr(settings, _env_attr, _env_val.strip("'\" \n"))

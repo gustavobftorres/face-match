@@ -32,7 +32,7 @@ celery_app = Celery(
     backend=redis_url,
     broker_use_ssl={"ssl_cert_reqs": "CERT_NONE"} if redis_url.startswith("rediss://") else None,
     redis_backend_use_ssl={"ssl_cert_reqs": "CERT_NONE"} if redis_url.startswith("rediss://") else None,
-    include=["app.workers.tasks"],
+    include=["app.workers.tasks", "app.workers.gallery_tasks"],
 )
 celery_app.conf.update(
     task_serializer="json",
@@ -40,6 +40,7 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    beat_schedule={"gallery-recovery": {"task": "gallery.recover_pending", "schedule": 60.0}},
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=50,
     task_acks_late=True,

@@ -1,0 +1,35 @@
+# Allow only files required by the backend image.
+*
+!app/
+!app/**
+!scripts/
+!scripts/**
+!requirements*.txt
+!start.sh
+!start_worker.sh
+
+# Never include environment files, credentials, keys, or local state even when
+# they appear within an allowed directory.
+**/.env
+**/.env.*
+**/env.local
+**/credentials*.json
+**/client_secret*.json
+**/*service-account*.json
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/venv/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.cache/
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/*secret*
+**/*credential*
+**/*.env
+**/.git/

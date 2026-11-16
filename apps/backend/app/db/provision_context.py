@@ -21,6 +21,7 @@ def provision(database_url: str, runtime_role: str) -> None:
             'GRANT SELECT, INSERT, UPDATE ON public.users TO {}',
             'GRANT SELECT, INSERT, DELETE ON public.login_challenges TO {}',
             'GRANT SELECT, INSERT, UPDATE ON public.app_sessions TO {}',
+            'GRANT SELECT, INSERT, UPDATE, DELETE ON public.gallery_jobs, public.gallery_photos, public.gallery_searches, public.gallery_results TO {}',
             'GRANT EXECUTE ON FUNCTION public.lookup_tenant_hostname(text) TO {}',
             'REVOKE ALL ON public.tenant_hostname_lookup FROM {}',
         ):

@@ -44,11 +44,14 @@ def test_lookup_backfill_triggers_and_default_privileges():
         conn.execute(sql.SQL('CREATE ROLE {} NOLOGIN').format(sql.Identifier(inherited_role)))
         conn.execute(sql.SQL('GRANT {} TO {}').format(sql.Identifier(inherited_role), sql.Identifier(role)))
         conn.execute(sql.SQL('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {}').format(sql.Identifier(inherited_role)))
+        conn.execute(sql.SQL('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO {}').format(sql.Identifier(inherited_role)))
     migrate(ADMIN)
     with psycopg.connect(ADMIN) as conn:
         assert conn.execute('SELECT tenant_id FROM public.tenant_hostname_lookup WHERE hostname = %s', (old,)).fetchone() == (tenant_id,)
         assert not conn.execute("SELECT has_table_privilege(%s, 'public.tenant_hostname_lookup', 'SELECT')", (role,)).fetchone()[0]
+        assert not conn.execute("SELECT has_function_privilege(%s, 'public.gallery_pending_jobs()', 'EXECUTE')", (role,)).fetchone()[0]
         conn.execute(sql.SQL('ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE SELECT ON TABLES FROM {}').format(sql.Identifier(inherited_role)))
+        conn.execute(sql.SQL('ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM {}').format(sql.Identifier(inherited_role)))
         conn.execute(sql.SQL('REVOKE {} FROM {}').format(sql.Identifier(inherited_role), sql.Identifier(role)))
         conn.execute(sql.SQL('DROP OWNED BY {}').format(sql.Identifier(inherited_role)))
         conn.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(inherited_role)))

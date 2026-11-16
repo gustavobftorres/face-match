@@ -50,6 +50,7 @@ def test_lookup_backfill_triggers_and_default_privileges():
         assert not conn.execute("SELECT has_table_privilege(%s, 'public.tenant_hostname_lookup', 'SELECT')", (role,)).fetchone()[0]
         conn.execute(sql.SQL('ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE SELECT ON TABLES FROM {}').format(sql.Identifier(inherited_role)))
         conn.execute(sql.SQL('REVOKE {} FROM {}').format(sql.Identifier(inherited_role), sql.Identifier(role)))
+        conn.execute(sql.SQL('DROP OWNED BY {}').format(sql.Identifier(inherited_role)))
         conn.execute(sql.SQL('DROP ROLE {}').format(sql.Identifier(inherited_role)))
     provision(ADMIN, role)
     with psycopg.connect(RUNTIME) as conn:
